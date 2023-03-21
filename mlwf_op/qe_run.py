@@ -30,7 +30,7 @@ class RunMLWFQe(RunMLWF):
         for f in backward_list:
             for p in Path(".").glob(f):
                 if p.is_file():
-                    shutil.copyfile(p, backward_dir)
+                    shutil.copy(p, backward_dir)
                 else:
                     shutil.copytree(p, backward_dir / p.name)
         return backward_dir
