@@ -1,6 +1,6 @@
 from typing import Dict, Union
 from pathlib import Path
-import dpdata, time
+import time, json
 from dflow.plugins.dispatcher import DispatcherExecutor
 from dflow import (
     Step, 
@@ -10,12 +10,14 @@ from dflow import (
 )
 from dflow.python import (
     PythonOPTemplate,
-    Slices
+    Slices,
+    upload_packages
 )
+import mlwf_op
 from mlwf_op.qe_prepare import PrepareQe
 from mlwf_op.qe_run import RunMLWFQe
 
-
+upload_packages += mlwf_op.__path__
 
 def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: dict):
     prepare_excutor = DispatcherExecutor(
@@ -37,12 +39,7 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
                 "batch_type": "Bohrium",
                 "context_type": "Bohrium",
                 "remote_profile": {
-                    "input_data": {
-                        "job_type": "container",
-                        "platform": "ali",
-                        "scass_type" : "c32_m64_cpu",
-                        "image_name": "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
-                    },
+                    "input_data": machine_setting["params"],
                 },
             },
         )
@@ -75,8 +72,8 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
         ),
         parameters = {
             "name": input_setting["name"],
-            "backward_list": ["*_centres.xyz"],
-            "backward_dir_name": "back",
+            "backward_list": machine_setting["backward_list"],
+            "backward_dir_name": machine_setting["backward_dir_name"],
             "commands": input_setting["commands"],
             "frames": prepare.outputs.parameters["frames_list"]
         },
@@ -93,3 +90,28 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
 
     assert(wf.query_status() == "Succeeded")
     return wf
+
+def bohrium_login():
+    from dflow import config, s3_config
+    from dflow.plugins import bohrium
+    from dflow.plugins.bohrium import TiefblueClient
+    from getpass import getpass
+    config["host"] = "https://workflows.deepmodeling.com"
+    config["k8s_api_server"] = "https://workflows.deepmodeling.com"
+    bohrium.config["username"] = input("Bohrium username: ")
+    bohrium.config["password"] = getpass("Bohrium password: ")
+    bohrium.config["project_id"] = input("Project ID: ")
+    s3_config["repo_key"] = "oss-bohrium"
+    s3_config["storage_client"] = TiefblueClient()
+
+with open("./input_setting.json", "r") as f:
+    input_setting = json.load(f)
+    
+with open("./machine_setting.json", "r") as f:
+    machine_setting = json.load(f)
+
+bohrium_login()
+
+wf = test_prep_run(input_setting, machine_setting)
+step = wf.query_step("prepare")[0]
+download_artifact(step.outputs.artifacts["task_path"], path="./back")
