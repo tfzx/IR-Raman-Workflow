@@ -11,7 +11,11 @@ class RunMLWFQe(RunMLWF):
     def __init__(self) -> None:
         super().__init__()
 
-    def run(self, if_print = True, *args, **kwargs):
+    def run(self, *args, **kwargs):
+        if_print = True
+        if "if_print" in kwargs:
+            if_print = kwargs["if_print"]
+            del kwargs["if_print"]
         ret, out, err = run_command(*args, **kwargs)
         if if_print:
             print(out)
@@ -30,7 +34,7 @@ class RunMLWFQe(RunMLWF):
         self.run(" ".join([self.wannier90_pp_cmd, "-pp", self.name]))
         self.run(" ".join(["mpirun -n 2 pw2wannier90.x"]), input=Path(f"{self.name}.pw2wan").read_text())
         self.run(" ".join([self.wannier_cmd, self.name]))
-        self.run(False, "rm -rf out")
+        self.run("rm -rf out", if_print = False)
         backward_dir = Path(backward_dir_name)
         backward_dir.mkdir()
         for f in backward_list:
