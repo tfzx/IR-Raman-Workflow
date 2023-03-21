@@ -61,7 +61,8 @@ class RunMLWF(OP, abc.ABC):
         with set_directory(task_path):
             for p in confs_path:
                 with set_directory(p):
-                    backward.append(self.run_one_frame(backward_dir_name, backward_list))
+                    backward_dir = self.run_one_frame(backward_dir_name, backward_list)
+                    backward.append(task_path / p / backward_dir)
         return backward
 
     @abc.abstractmethod
