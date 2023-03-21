@@ -3,7 +3,7 @@
     "commands": {
         "pw": "mpirun -n 32 pw.x",
         "pw2wannier": "mpirun -n 32 pw2wannier90.x",
-        "wannier90": "mpirun -n 32 wannier90.x",
+        "wannier90": "wannier90.x",
         "wannier90_pp": "wannier90.x"
     },
     "dft_type": "qe",
