@@ -22,7 +22,7 @@ class RunMLWFQe(RunMLWF):
         if Path("nscf.in").exists():
             run_command(" ".join([self.pw_cmd, "-input", "nscf.in"]))
         run_command(" ".join([self.wannier90_pp_cmd, "-pp", self.name]))
-        run_command(" ".join([self.pw2wan_cmd, "<", f"{self.name}.pw2wan"]))
+        run_command(" ".join(["mpirun -n 2 pw2wannier90.x"]), input=Path(f"{self.name}.pw2wan").read_text())
         run_command(" ".join([self.wannier_cmd, self.name]))
         run_command("rm -rf out")
         backward_dir = Path(backward_dir_name)
