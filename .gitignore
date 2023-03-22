@@ -5,6 +5,7 @@ __pycache__/
 *.egg-info
 .vscode
 **/task.*
+**/back
 **/account*.json
 tests/data*
-/**/tmp
+**/tmp
