@@ -1,3 +1,4 @@
+from math import ceil
 from typing import Dict, List, Tuple, Union
 from pathlib import Path
 import abc
@@ -57,7 +58,7 @@ class Prepare(OP, abc.ABC):
         nframes = confs.get_nframes()
         task_path = []
         frames_list = []
-        for i in range(int(nframes / group_size)):
+        for i in range(ceil(nframes / group_size)):
             task_name = f"task.{i:06d}"
             print(task_name)
             task = Path(task_name)
