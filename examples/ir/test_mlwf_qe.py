@@ -16,6 +16,7 @@ from dflow.python import (
 import mlwf_op
 from mlwf_op.qe_prepare import PrepareQe
 from mlwf_op.qe_run import RunMLWFQe
+from mlwf_op.collect_wfc_op import CollectWFC
 
 upload_packages += mlwf_op.__path__
 
@@ -44,18 +45,20 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
             },
         )
     wf = Workflow("prepare-run-test")
-    prepare = Step("prepare",
-                   PythonOPTemplate(PrepareQe, image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"),
-                   artifacts={
-                        "confs": upload_artifact("./data"),
-                        "pseudo": upload_artifact("./pseudo")
-                    },
-                   parameters={
-                        "input_setting": input_setting,
-                        "group_size": machine_setting["group_size"]
-                   },
-                   executor = prepare_excutor
-                  )
+    confs_artifact = upload_artifact("./data")
+    prepare = Step(
+        "prepare",
+        PythonOPTemplate(PrepareQe, image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"),
+        artifacts={
+            "confs": confs_artifact,
+            "pseudo": upload_artifact("./pseudo")
+        },
+        parameters={
+            "input_setting": input_setting,
+            "group_size": machine_setting["group_size"]
+        },
+        executor = prepare_excutor
+    )
     wf.add(prepare)
     run = Step(
         "Run",
@@ -84,6 +87,19 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
         executor = run_executor
     )
     wf.add(run)
+    collect = Step(
+        "collect-wfc",
+        PythonOPTemplate(CollectWFC, image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"),
+        artifacts={
+            "confs": confs_artifact,
+            "backward": run.outputs.artifacts["backward"]
+        },
+        parameters={
+            "name": input_setting["name"],
+        },
+        executor = prepare_excutor
+    )
+    wf.add(collect)
     wf.submit()
     while wf.query_status() in ["Pending", "Running"]:
         time.sleep(1)
@@ -98,9 +114,12 @@ def bohrium_login():
     from getpass import getpass
     config["host"] = "https://workflows.deepmodeling.com"
     config["k8s_api_server"] = "https://workflows.deepmodeling.com"
-    bohrium.config["username"] = input("Bohrium username: ")
-    bohrium.config["password"] = getpass("Bohrium password: ")
-    bohrium.config["project_id"] = input("Project ID: ")
+    with open("./account_config.json", "r") as f:
+        account = json.load(f)
+    # bohrium.config["username"] = input("Bohrium username: ")
+    # bohrium.config["password"] = getpass("Bohrium password: ")
+    # bohrium.config["project_id"] = input("Project ID: ")
+    bohrium.config.update(account)
     s3_config["repo_key"] = "oss-bohrium"
     s3_config["storage_client"] = TiefblueClient()
 
@@ -112,6 +131,10 @@ with open("./machine_setting.json", "r") as f:
 
 bohrium_login()
 
+
 wf = test_prep_run(input_setting, machine_setting)
 step = wf.query_step("prepare")[0]
-download_artifact(step.outputs.artifacts["task_path"], path="./back")
+run = wf.query_step("Run")[0]
+collect = wf.query_step("collect")[0]
+download_artifact(run.outputs.artifacts["backward"], path="./back")
+download_artifact(collect.outputs.artifacts["wannier_function_centers"], path="./data")
