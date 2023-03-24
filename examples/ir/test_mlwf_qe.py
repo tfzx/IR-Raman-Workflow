@@ -135,6 +135,6 @@ bohrium_login()
 wf = test_prep_run(input_setting, machine_setting)
 step = wf.query_step("prepare")[0]
 run = wf.query_step("Run")[0]
-collect = wf.query_step("collect")[0]
+collect = wf.query_step("collect-wfc")[0]
 download_artifact(run.outputs.artifacts["backward"], path="./back")
 download_artifact(collect.outputs.artifacts["wannier_function_centers"], path="./back")
