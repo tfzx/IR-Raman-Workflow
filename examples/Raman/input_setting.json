@@ -1,0 +1,71 @@
+{
+    "name": "water",
+    "commands": {
+        "pw": "mpirun -n 32 pw.x",
+        "pw2wannier": "mpirun -n 32 pw2wannier90.x",
+        "wannier90": "wannier90.x",
+        "wannier90_pp": "wannier90.x"
+    },
+    "dft_type": "qe",
+    "dft_params": {
+        "cal_type": "scf",
+        "qe_params": {
+            "control": {
+                "title": "water",
+                "lelfield": true,
+                "nberrycyc": 3
+            },
+            "system": {
+                "ecutwfc": 110,
+                "nosym": true,
+                "input_dft": "PBE",
+                "ibrav": 0
+            },
+            "electrons": {
+                "conv_thr": 1e-07,
+                "efield_cart(1)": 0.0,
+                "efield_cart(2)": 0.0,
+                "efield_cart(3)": 0.001
+            },
+            "ions": null,
+            "cell": null
+        },
+        "pw2wan_params": {
+            "inputpp": {
+                "spin_component": null,
+                "write_mmn": true,
+                "write_amn": true,
+                "write_unk": false
+            }
+        },
+        "pseudo_dir": "pseudo",
+        "atomic_species": {
+            "O": {
+                "mass": 16.0,
+                "pseudo": "O_ONCV_PBE-1.2.upf"
+            },
+            "H": {
+                "mass": 1.0,
+                "pseudo": "H_ONCV_PBE-1.2.upf"
+            }
+        },
+        "k_grid": [
+            1,
+            1,
+            1
+        ]
+    },
+    "wannier90_params": {
+        "wan_params": {
+            "num_iter": 200,
+            "num_wann": 256,
+            "write_xyz": true,
+            "translate_home_cell": true,
+            "guiding_centres": true,
+            "mp_grid": "1, 1, 1"
+        },
+        "projections": {
+            "O": "sp3"
+        }
+    }
+}
