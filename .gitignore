@@ -9,3 +9,4 @@ __pycache__/
 **/account*.json
 tests/data*
 **/tmp
+**/data/*
