@@ -13,7 +13,7 @@ from dflow.utils import (
 )
 from pp_op.cal_wannier_centroid import cal_wc_h2o
 
-class CalWannierCentroid(OP):
+class CalWC(OP):
     def __init__(self) -> None:
         super().__init__()
     

@@ -1,4 +1,4 @@
-from pp_op.wannier_centroid_op import CalWannierCentroid
+from pp_op.wannier_centroid_op import CalWC
 import unittest, shutil, os, numpy as np
 from pathlib import Path
 from dflow.python import (
@@ -22,7 +22,7 @@ class TestWC(unittest.TestCase):
         return super().tearDown()
 
     def test_001(self):
-        wc_op = CalWannierCentroid()
+        wc_op = CalWC()
         op_in = {
             "confs": self.confs,
             "wannier_function_centers": self.wfc

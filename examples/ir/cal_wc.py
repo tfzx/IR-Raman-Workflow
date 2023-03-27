@@ -14,7 +14,7 @@ from dflow.python import (
     upload_packages
 )
 import pp_op
-from pp_op.wannier_centroid_op import CalWannierCentroid
+from pp_op.wannier_centroid_op import CalWC
 upload_packages += pp_op.__path__
 
 def bohrium_login():
@@ -52,7 +52,7 @@ cal_wc_excutor = DispatcherExecutor(
 wf = Workflow("calculate-wc")
 cal = Step(
     "calculate",
-    PythonOPTemplate(CalWannierCentroid, image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"),
+    PythonOPTemplate(CalWC, image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"),
     artifacts={
         "confs": upload_artifact("./data"),
         "wannier_function_centers": upload_artifact("./back/wfc.raw")
