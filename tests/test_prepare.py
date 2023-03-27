@@ -25,7 +25,7 @@ class TestPrepare(unittest.TestCase):
         prepare = MockedPrepare()
         op_in = OPIO({
             "input_setting": {},
-            "group_size": group_size,
+            "task_setting": {"group_size": group_size},
             "confs": self.confs,
             "pseudo": self.pseudo
         })

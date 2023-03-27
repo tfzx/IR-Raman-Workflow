@@ -1,11 +1,5 @@
 {
     "name": "water",
-    "commands": {
-        "pw": "mpirun -n 32 pw.x",
-        "pw2wannier": "mpirun -n 32 pw2wannier90.x",
-        "wannier90": "wannier90.x",
-        "wannier90_pp": "wannier90.x"
-    },
     "dft_type": "qe",
     "dft_params": {
         "cal_type": "scf",
@@ -14,13 +8,13 @@
                 "title": "water"
             },
             "system": {
-                "ecutwfc": 110,
+                "ecutwfc": 50,
                 "nosym": true,
                 "input_dft": "PBE",
                 "ibrav": 0
             },
             "electrons": {
-                "conv_thr": 1e-07
+                "conv_thr": 1e-05
             },
             "ions": null,
             "cell": null
@@ -52,7 +46,7 @@
     },
     "wannier90_params": {
         "wan_params": {
-            "num_iter": 200,
+            "num_iter": 100,
             "num_wann": 256,
             "write_xyz": true,
             "translate_home_cell": true,

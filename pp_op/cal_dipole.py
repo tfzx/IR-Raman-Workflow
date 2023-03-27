@@ -18,20 +18,24 @@ from dflow.python import (
 from dflow.utils import (
     set_directory
 )
+import mlwf_op, pp_op
 from mlwf_op.qe_prepare import PrepareQe
 from mlwf_op.qe_run import RunMLWFQe
 from mlwf_op.collect_wfc_op import CollectWFC
+from pp_op.wannier_centroid_op import CalWC
 
-class cal_dipole(Steps):
+class CalDipole(Steps):
     def __init__(
             self,
             name,
             prepare_executor: Executor,
             run_executor: Executor,
+            cal_executor: Executor,
+            upload_python_packages: List[Union[str, Path]] = None
         ):
         self._input_parameters = {
             "input_setting": InputParameter(type = dict, value = {}),
-            "machine_setting": InputParameter(type = dict, value = {}),
+            "task_setting": InputParameter(type = dict, value = {}),
         }
         self._input_artifacts = {
             "confs": InputArtifact(),
@@ -52,17 +56,26 @@ class cal_dipole(Steps):
                 artifacts = self._output_artifacts
             )
         )
-        self.build_steps(prepare_executor, run_executor)
+        if not upload_python_packages:
+            upload_python_packages = mlwf_op.__path__ + pp_op.__path__
+        self.build_steps(prepare_executor, run_executor, cal_executor, upload_python_packages)
         
-    def build_steps(self, prepare_executor, run_executor):
+    def build_steps(
+            self, 
+            prepare_executor: Executor, 
+            run_executor: Executor, 
+            cal_executor: Executor,
+            upload_python_packages: List[Union[str, Path]]
+        ):
         input_setting = self.inputs.parameters["input_setting"]
-        machine_setting = self.inputs.parameters["machine_setting"]
+        task_setting = self.inputs.parameters["task_setting"]
         confs_artifact = self.inputs.artifacts["confs"]
         prepare = Step(
             "prepare",
             PythonOPTemplate(
                 PrepareQe, 
-                image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"
+                image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                python_packages = upload_python_packages
             ),
             artifacts={
                 "confs": confs_artifact,
@@ -70,13 +83,13 @@ class cal_dipole(Steps):
             },
             parameters={
                 "input_setting": input_setting,
-                "group_size": machine_setting["group_size"]
+                "task_setting": task_setting
             },
             executor = prepare_executor
         )
         self.add(prepare)
         run = Step(
-            "Run",
+            "run",
             PythonOPTemplate(
                 RunMLWFQe, 
                 image = "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
@@ -87,12 +100,11 @@ class cal_dipole(Steps):
                     output_artifact = ["backward"],
                     sub_path = True
                 ),
+                python_packages = upload_python_packages
             ),
             parameters = {
-                "name": input_setting["name"],
-                "backward_list": machine_setting["backward_list"],
-                "backward_dir_name": machine_setting["backward_dir_name"],
-                "commands": input_setting["commands"],
+                "input_setting": input_setting,
+                "task_setting": task_setting,
                 "frames": prepare.outputs.parameters["frames_list"]
             },
             artifacts = {
@@ -103,20 +115,37 @@ class cal_dipole(Steps):
         )
         self.add(run)
         collect = Step(
-            "collect-wfc",
+            "collect",
             PythonOPTemplate(
                 CollectWFC, 
-                image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"
+                image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                python_packages = upload_python_packages,
             ),
             artifacts={
                 "confs": confs_artifact,
                 "backward": run.outputs.artifacts["backward"]
             },
             parameters={
-                "name": input_setting["name"],
+                "input_setting": input_setting,
             },
             executor = prepare_executor
         )
         self.add(collect)
-        pass
-    
+        cal = Step(
+            "calculate",
+            PythonOPTemplate(
+                CalWC, 
+                image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                python_packages = upload_python_packages
+            ),
+            artifacts={
+                "confs": confs_artifact,
+                "wannier_function_centers": collect.outputs.artifacts["wannier_function_centers"]
+            },
+            executor = cal_executor
+        )
+        self.add(cal)
+        self.outputs.artifacts["backward"]._from = run.outputs.artifacts["backward"]
+        self.outputs.artifacts["wannier_function_centers"]._from = collect.outputs.artifacts["wannier_function_centers"]
+        self.outputs.artifacts["wannier_centroid"]._from = cal.outputs.artifacts["wannier_centroid"]
+        return

@@ -1,11 +1,5 @@
 {
     "type": "bohrium",
-    "group_size": 2,
-    "backward_list": [
-        "*.xyz",
-        "*.wout"
-    ],
-    "backward_dir_name": "back",
     "params": {
         "image_name": "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
         "machine_type": "c32_m64_cpu",

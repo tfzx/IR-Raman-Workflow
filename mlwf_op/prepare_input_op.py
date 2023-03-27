@@ -25,7 +25,7 @@ class Prepare(OP, abc.ABC):
     def get_input_sign(cls):
         return OPIOSign({
             "input_setting": BigParameter(dict),
-            "group_size": int,
+            "task_setting": BigParameter(dict),
             "confs": Artifact(Path),
             "pseudo": Artifact(Path)
         })
@@ -43,9 +43,9 @@ class Prepare(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
+        group_size: int = op_in["task_setting"]["group_size"]
         confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
         pseudo: Path = op_in["pseudo"]
-        group_size: int = op_in['group_size']
 
         self.init_inputs(input_setting, confs)
         task_path, frames_list = self._exec_all(confs, pseudo, group_size)

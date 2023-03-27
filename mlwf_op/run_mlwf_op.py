@@ -23,11 +23,9 @@ class RunMLWF(OP, abc.ABC):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "name": str,
-            "backward_dir_name": str,
-            "backward_list": BigParameter(List[str]),
-            "commands": BigParameter(Dict[str, str]),
             "task_path": Artifact(Path),
+            "input_setting": BigParameter(dict),
+            "task_setting": BigParameter(dict),
             "frames": BigParameter(Tuple[int]),
         })
 
@@ -42,12 +40,14 @@ class RunMLWF(OP, abc.ABC):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        self.name: str = op_in["name"]
-        backward_list: List[str] = op_in["backward_list"]
-        backward_dir_name: str = op_in["backward_dir_name"]
-        commands: Dict[str, str] = op_in["commands"]
         task_path: Path = op_in["task_path"]
+        self.name: str = op_in["input_setting"]["name"]
+        task_setting: dict = op_in["task_setting"]
+        backward_list: List[str] = task_setting["backward_list"]
+        backward_dir_name: str = task_setting["backward_dir_name"]
+        commands: Dict[str, str] = task_setting["commands"]
         start_f, end_f = op_in["frames"]
+
         confs_path = [Path(f"conf.{f:06d}") for f in range(start_f, end_f)]
 
         self.init_cmd(commands)

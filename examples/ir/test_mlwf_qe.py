@@ -20,8 +20,8 @@ from mlwf_op.collect_wfc_op import CollectWFC
 
 upload_packages += mlwf_op.__path__
 
-def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: dict):
-    prepare_excutor = DispatcherExecutor(
+def test_prep_run(input_setting: Dict[str, Union[str, dict]], task_setting: dict, machine_setting: dict):
+    prepare_executor = DispatcherExecutor(
             machine_dict={
                 "batch_type": "Bohrium",
                 "context_type": "Bohrium",
@@ -55,9 +55,9 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
         },
         parameters={
             "input_setting": input_setting,
-            "group_size": machine_setting["group_size"]
+            "task_setting": task_setting
         },
-        executor = prepare_excutor
+        executor = prepare_executor
     )
     wf.add(prepare)
     run = Step(
@@ -74,10 +74,8 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
             ),
         ),
         parameters = {
-            "name": input_setting["name"],
-            "backward_list": machine_setting["backward_list"],
-            "backward_dir_name": machine_setting["backward_dir_name"],
-            "commands": input_setting["commands"],
+            "input_setting": input_setting,
+            "task_setting": task_setting,
             "frames": prepare.outputs.parameters["frames_list"]
         },
         artifacts = {
@@ -95,9 +93,9 @@ def test_prep_run(input_setting: Dict[str, Union[str, dict]], machine_setting: d
             "backward": run.outputs.artifacts["backward"]
         },
         parameters={
-            "name": input_setting["name"],
+            "input_setting": input_setting,
         },
-        executor = prepare_excutor
+        executor = prepare_executor
     )
     wf.add(collect)
     wf.submit()
@@ -125,14 +123,17 @@ def bohrium_login():
 
 with open("./input_setting.json", "r") as f:
     input_setting = json.load(f)
-    
+
+with open("./task_setting.json", "r") as f:
+    task_setting = json.load(f)
+
 with open("./machine_setting.json", "r") as f:
     machine_setting = json.load(f)
 
 bohrium_login()
 
 
-wf = test_prep_run(input_setting, machine_setting)
+wf = test_prep_run(input_setting, task_setting, machine_setting)
 step = wf.query_step("prepare")[0]
 run = wf.query_step("Run")[0]
 collect = wf.query_step("collect-wfc")[0]

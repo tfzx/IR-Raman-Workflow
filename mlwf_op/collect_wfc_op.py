@@ -19,7 +19,7 @@ class CollectWFC(OP):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "name": str,
+            "input_setting": BigParameter(dict),
             "confs": Artifact(Path),
             "backward": Artifact(List[Path]),
         })
@@ -35,7 +35,7 @@ class CollectWFC(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        self.name: str = op_in["name"]
+        self.name: str = op_in["input_setting"]["name"]
         self.confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
         backward: List[Path] = op_in["backward"]
 
