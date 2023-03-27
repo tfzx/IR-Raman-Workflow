@@ -11,3 +11,4 @@ tests/data*
 **/tmp
 **/data/*
 **/tmp*.py
+/exp
