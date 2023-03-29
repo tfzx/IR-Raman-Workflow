@@ -1,5 +1,5 @@
 {
-    "group_size": 2,
+    "group_size": 1,
     "commands": {
         "pw": "mpirun -n 64 pw.x",
         "pw2wannier": "mpirun -n 64 pw2wannier90.x",
