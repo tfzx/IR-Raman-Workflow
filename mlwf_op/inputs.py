@@ -4,7 +4,7 @@ from copy import deepcopy
 from tempfile import TemporaryFile
 import dpdata
 import abc
-from mlwf_op.utils import kmesh
+from mlwf_op.utils import kmesh, complete_by_default
 
 class QeInputs(abc.ABC):
     def __init__(self) -> None:
@@ -71,33 +71,36 @@ class QeInputs(abc.ABC):
             params_str = f.read()
         return params_str
 
-def complete_qe(input_params: Dict[str, dict], calculation: str, k_grid: Tuple[int, int, int], 
-                confs: dpdata.System):
-    input_params = deepcopy(input_params)
-    input_params["control"].update({
-        "restart_mode"  : "from_scratch",
-        "prefix"        : "mlwf",
-        "pseudo_dir"    : "../pseudo",
-        "outdir"        : "out"
-    })
-    input_params["control"]["calculation"] = calculation
-    input_params["system"].update({
-        "ntyp"  : len(confs["atom_names"]),
-        "nat"   : confs.get_natoms()
-    })
-    if calculation == "scf":
-        kpoints = {
-            "type": "automatic",
-            "k_grid": k_grid
+def complete_qe(input_params: Dict[str, dict], calculation: Optional[str] = None, 
+                k_grid: Optional[Tuple[int, int, int]] = None, 
+                confs: Optional[dpdata.System] = None):
+    input_params_default: Dict[str, dict] = {}
+    if calculation:
+        input_params_default["control"] = {
+            "calculation"   : calculation
         }
-    else:
-        kpoints = {
-            "type": "crystal",
-            "k_grid": kmesh(*k_grid)
+    if confs:
+        input_params_default["system"] = {
+            "ntyp"  : len(confs["atom_names"]),
+            "nat"   : confs.get_natoms()
         }
+    input_params = complete_by_default(input_params, input_params_default, if_copy = True)
+    kpoints = None
+    if k_grid:
+        calculation = input_params["control"]["calculation"]
+        if calculation == "scf":
+            kpoints = {
+                "type": "automatic",
+                "k_grid": k_grid
+            }
+        else:
+            kpoints = {
+                "type": "crystal",
+                "k_grid": kmesh(*k_grid)
+            }
     return input_params, kpoints
 
-class QePwInputs(QeInputs):
+class QeParamsConfs(QeInputs):
     def __init__(self, input_params: Dict[str, dict], kpoints: Dict[str, Union[str, np.ndarray]], 
                  atomic_species: dict, confs: dpdata.System, optional_input: str = None) -> None:
         super().__init__()
@@ -112,16 +115,16 @@ class QePwInputs(QeInputs):
     def write(self, frame: int):
         return "\n".join([self.params_str, self.write_configuration(self.confs[frame], self.atoms)])
 
-def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlwf"):
+def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlwf", outdir: str = "out"):
     input_params = deepcopy(input_params)
     input_params["inputpp"].update({
-        "outdir" : "out",
+        "outdir" : outdir,
         "prefix" : prefix,
         "seedname" : name,
     })
     return input_params
 
-class QePw2Wannier90Inputs(QeInputs):
+class QeParams(QeInputs):
     def __init__(self, input_params: Dict[str, dict]) -> None:
         super().__init__()
         self.params_str = self.write_parameters(input_params)
