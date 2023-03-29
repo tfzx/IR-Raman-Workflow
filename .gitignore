@@ -12,3 +12,5 @@ tests/data*
 **/data/*
 **/tmp*.py
 /exp
+**/*.upf
+**/*.UPF
