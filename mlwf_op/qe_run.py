@@ -1,25 +1,11 @@
 from typing import Dict, List, Optional, Tuple, Union
 from pathlib import Path
 from mlwf_op.run_mlwf_op import RunMLWF
-from dflow.utils import (
-    set_directory,
-    run_command
-)
 import shutil
 
 class RunMLWFQe(RunMLWF):
     def __init__(self) -> None:
         super().__init__()
-
-    def run(self, *args, **kwargs):
-        if_print = True
-        if "if_print" in kwargs:
-            if_print = kwargs["if_print"]
-            del kwargs["if_print"]
-        ret, out, err = run_command(*args, **kwargs)
-        if if_print:
-            print(out)
-        # TODO: Save log here.
 
     def init_cmd(self, commands: Dict[str, str]):
         self.pw_cmd = commands.get("pw", "pw.x")
@@ -44,4 +30,5 @@ class RunMLWFQe(RunMLWF):
                     shutil.copy(p, backward_dir)
                 else:
                     shutil.copytree(p, backward_dir / p.name)
+        shutil.copy(self.log_path, backward_dir)
         return backward_dir
