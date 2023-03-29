@@ -39,6 +39,8 @@ class RunCPWF(RunMLWF):
         self.cp_cmd = commands.get("cp", "cp.x")
         return super().init_cmd(commands)
 
-    def run_one_frame(self, backward_dir_name: str, backward_list: List[str]) -> Path:
+    def run_one_frame(self) -> Path:
         self.run(" ".join([self.cp_cmd, "-input", f"cp_{self.name}.in"]))
-        return super().run_one_frame(backward_dir_name, backward_list)
+        backward_dir = Path(self.backward_dir_name)
+        backward_dir.mkdir()
+        return backward_dir

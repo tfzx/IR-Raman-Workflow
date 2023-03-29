@@ -44,8 +44,8 @@ class RunMLWF(OP, abc.ABC):
         task_path: Path = op_in["task_path"]
         self.name: str = op_in["input_setting"]["name"]
         task_setting: dict = op_in["task_setting"]
-        backward_list: List[str] = task_setting["backward_list"]
-        backward_dir_name: str = task_setting["backward_dir_name"]
+        self.backward_list: List[str] = task_setting["backward_list"]
+        self.backward_dir_name: str = task_setting["backward_dir_name"]
         commands: Dict[str, str] = task_setting["commands"]
         start_f, end_f = op_in["frames"]
 
@@ -53,19 +53,30 @@ class RunMLWF(OP, abc.ABC):
         self.log_path = Path("run.log")
 
         self.init_cmd(commands)
-        backward = self._exec_all(task_path, confs_path, backward_dir_name, backward_list)
+        backward = self._exec_all(task_path, confs_path)
         return OPIO({
             "backward": backward
         })
     
-    def _exec_all(self, task_path: Path, confs_path: List[Path], backward_dir_name: str, backward_list: List[str]):
+    def _exec_all(self, task_path: Path, confs_path: List[Path]):
         backward: List[Path] = []
         with set_directory(task_path):
             for p in confs_path:
                 with set_directory(p):
-                    backward_dir = self.run_one_frame(backward_dir_name, backward_list)
+                    backward_dir = self.run_one_frame()
+                    self._collect(backward_dir)
                     backward.append(task_path / p / backward_dir)
         return backward
+
+    def _collect(self, backward_dir: Path):
+        for f in self.backward_list:
+            for p in Path(".").glob(f):
+                print(p.name)
+                if p.is_file():
+                    shutil.copy(p, backward_dir)
+                else:
+                    shutil.copytree(p, backward_dir / p.name)
+        shutil.copy(self.log_path, backward_dir)
 
     def run(self, *args, **kwargs):
         if_print = True
@@ -84,5 +95,5 @@ class RunMLWF(OP, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def run_one_frame(self, backward_dir_name: str, backward_list: List[str]) -> Path:
+    def run_one_frame(self) -> Path:
         pass
