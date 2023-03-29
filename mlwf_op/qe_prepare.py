@@ -62,39 +62,3 @@ class PrepareQe(Prepare):
         Path(f"{self.name}.pw2wan").write_text(self.pw2wan_writer.write(frame))
         Path(f"{self.name}.win").write_text(self.wannier90_writer.write(frame))
         return super().write_one_frame(frame)
-
-
-def test_prepare(input_setting: Dict[str, Union[str, dict]], machine_setting: dict):
-    dispatcher_executor = DispatcherExecutor(
-            machine_dict={
-                "batch_type": "Bohrium",
-                "context_type": "Bohrium",
-                "remote_profile": {
-                    "input_data": {
-                        "job_type": "container",
-                        "platform": "ali",
-                        "scass_type" : "c8_m16_cpu"
-                    },
-                },
-            },
-        )
-    wf = Workflow("prepare-test")
-    prepare = Step("prepare",
-                   PythonOPTemplate(PrepareQe, image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6"),
-                   artifacts={
-                        "confs": upload_artifact("./data"),
-                        "pseudo": upload_artifact("./pseudo")
-                    },
-                   parameters={
-                        "input_setting": input_setting,
-                        "group_size": machine_setting["group_size"]
-                   },
-                   executor = dispatcher_executor
-                  )
-    wf.add(prepare)
-    wf.submit()
-    while wf.query_status() in ["Pending", "Running"]:
-        time.sleep(1)
-
-    assert(wf.query_status() == "Succeeded")
-    return wf
