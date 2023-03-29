@@ -4,8 +4,7 @@
         "cp": "mpirun -n 64 cp.x"
     },
     "backward_list": [
-        "*.xyz",
-        "*.wout"
+        "*/*.wfc"
     ],
     "backward_dir_name": "back"
 }
