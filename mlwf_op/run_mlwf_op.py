@@ -13,7 +13,8 @@ from dflow.python import (
     upload_packages
 )
 from dflow.utils import (
-    set_directory
+    set_directory,
+    run_command
 )
 
 class RunMLWF(OP, abc.ABC):
@@ -49,6 +50,7 @@ class RunMLWF(OP, abc.ABC):
         start_f, end_f = op_in["frames"]
 
         confs_path = [Path(f"conf.{f:06d}") for f in range(start_f, end_f)]
+        self.log_path = Path("run.log")
 
         self.init_cmd(commands)
         backward = self._exec_all(task_path, confs_path, backward_dir_name, backward_list)
@@ -64,6 +66,18 @@ class RunMLWF(OP, abc.ABC):
                     backward_dir = self.run_one_frame(backward_dir_name, backward_list)
                     backward.append(task_path / p / backward_dir)
         return backward
+
+    def run(self, *args, **kwargs):
+        if_print = True
+        if "if_print" in kwargs:
+            if_print = kwargs["if_print"]
+            del kwargs["if_print"]
+        ret, out, err = run_command(*args, **kwargs)
+        if if_print:
+            print(out)
+        # Save log here.
+        with self.log_path.open(mode = "a") as fp:
+            fp.write(out)
 
     @abc.abstractmethod
     def init_cmd(self, commands: Dict[str, str]):
