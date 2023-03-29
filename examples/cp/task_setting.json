@@ -1,0 +1,11 @@
+{
+    "group_size": 2,
+    "commands": {
+        "cp": "mpirun -n 64 cp.x"
+    },
+    "backward_list": [
+        "*.xyz",
+        "*.wout"
+    ],
+    "backward_dir_name": "back"
+}
