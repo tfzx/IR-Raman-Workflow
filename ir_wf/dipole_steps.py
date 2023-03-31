@@ -13,20 +13,27 @@ from dflow import (
 )
 from dflow.python import (
     PythonOPTemplate,
-    Slices
+    Slices,
+    OP
 )
 from dflow.utils import (
     set_directory
 )
 import mlwf_op, pp_op
-from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
-from mlwf_op.collect_wannier90 import CollectWann
+# from mlwf_op.prepare_input_op import Prepare
+# from mlwf_op.run_mlwf_op import RunMLWF
+# from mlwf_op.collect_wfc_op import CollectWFC
+# from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
+# from mlwf_op.collect_wannier90 import CollectWann
 from pp_op.wannier_centroid_op import CalWC
 
 class DipoleSteps(Steps):
     def __init__(
             self,
             name,
+            prepare_op: OP,
+            run_op: OP,
+            collect_op: OP,
             prepare_executor: Executor,
             run_executor: Executor,
             cal_executor: Executor,
@@ -57,10 +64,21 @@ class DipoleSteps(Steps):
         )
         if not upload_python_packages:
             upload_python_packages = mlwf_op.__path__ + pp_op.__path__
-        self.build_steps(prepare_executor, run_executor, cal_executor, upload_python_packages)
+        self.build_steps(
+            prepare_op, 
+            run_op, 
+            collect_op, 
+            prepare_executor, 
+            run_executor, 
+            cal_executor, 
+            upload_python_packages
+        )
         
     def build_steps(
             self, 
+            prepare_op: OP, 
+            run_op: OP, 
+            collect_op: OP, 
             prepare_executor: Executor, 
             run_executor: Executor, 
             cal_executor: Executor,
@@ -72,7 +90,7 @@ class DipoleSteps(Steps):
         prepare = Step(
             "prepare",
             PythonOPTemplate(
-                PrepareQeWann, 
+                prepare_op, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages
             ),
@@ -90,7 +108,7 @@ class DipoleSteps(Steps):
         run = Step(
             "run",
             PythonOPTemplate(
-                RunQeWann, 
+                run_op, 
                 image = "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
                 slices = Slices(
                     # "int('{{item}}')",
@@ -116,7 +134,7 @@ class DipoleSteps(Steps):
         collect = Step(
             "collect",
             PythonOPTemplate(
-                CollectWann, 
+                collect_op, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages,
             ),

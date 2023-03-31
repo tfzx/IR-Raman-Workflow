@@ -9,6 +9,8 @@ from dflow import (
     download_artifact
 )
 from ir_wf.dipole_steps import DipoleSteps
+from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
+from mlwf_op.collect_wannier90 import CollectWann
 
 
 def bohrium_login():
@@ -76,6 +78,9 @@ cal_executor = DispatcherExecutor(
 )
 steps = DipoleSteps(
     name = "calculate-dipole-qe",
+    prepare_op = PrepareQeWann,
+    run_op = RunQeWann,
+    collect_op = CollectWann,
     prepare_executor = prepare_executor,
     run_executor = run_executor,
     cal_executor = cal_executor
