@@ -19,12 +19,11 @@ from dflow.utils import (
     set_directory
 )
 import mlwf_op, pp_op
-from mlwf_op.qe_prepare import PrepareQe
-from mlwf_op.qe_run import RunMLWFQe
-from mlwf_op.collect_wfc_op import CollectWFC
+from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
+from mlwf_op.collect_wannier90 import CollectWann
 from pp_op.wannier_centroid_op import CalWC
 
-class CalDipole(Steps):
+class DipoleSteps(Steps):
     def __init__(
             self,
             name,
@@ -73,7 +72,7 @@ class CalDipole(Steps):
         prepare = Step(
             "prepare",
             PythonOPTemplate(
-                PrepareQe, 
+                PrepareQeWann, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages
             ),
@@ -91,7 +90,7 @@ class CalDipole(Steps):
         run = Step(
             "run",
             PythonOPTemplate(
-                RunMLWFQe, 
+                RunQeWann, 
                 image = "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
                 slices = Slices(
                     # "int('{{item}}')",
@@ -117,7 +116,7 @@ class CalDipole(Steps):
         collect = Step(
             "collect",
             PythonOPTemplate(
-                CollectWFC, 
+                CollectWann, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages,
             ),

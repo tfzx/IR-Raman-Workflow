@@ -8,7 +8,7 @@ from dflow import (
     upload_artifact,
     download_artifact
 )
-from pp_op.cal_dipole import CalDipole
+from ir_wf.dipole_steps import DipoleSteps
 
 
 def bohrium_login():
@@ -74,7 +74,7 @@ cal_executor = DispatcherExecutor(
         },
     },
 )
-steps = CalDipole(
+steps = DipoleSteps(
     name = "calculate-dipole-qe",
     prepare_executor = prepare_executor,
     run_executor = run_executor,
