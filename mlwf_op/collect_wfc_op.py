@@ -1,6 +1,6 @@
 from typing import Dict, List, Tuple, Union
 from pathlib import Path
-import dpdata, numpy as np
+import dpdata, numpy as np, abc
 from dflow.python import (
     OP, 
     OPIO, 
@@ -12,7 +12,7 @@ from dflow.utils import (
     set_directory
 )
 
-class CollectWFC(OP):
+class CollectWFC(OP, abc.ABC):
     def __init__(self) -> None:
         super().__init__()
     
@@ -56,5 +56,6 @@ class CollectWFC(OP):
                 wc[frame] = self.get_one_frame(frame, num_wann).flatten()
         return wc
 
+    @abc.abstractmethod
     def get_one_frame(self, frame: int, num_wann: int) -> np.ndarray:
-        return np.loadtxt(f'{self.name}_centres.xyz', dtype = float, skiprows = 2, usecols = [1, 2, 3], max_rows = num_wann)
+        pass
