@@ -12,7 +12,7 @@ from dflow.python import (
     PythonOPTemplate,
     Slices
 )
-from mlwf_op.cp_wf import PrepareCP, RunCPWF
+from mlwf_op.qe_cp import PrepareCP, RunCPWF
 import mlwf_op
 
 def bohrium_login():
