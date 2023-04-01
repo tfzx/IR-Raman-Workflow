@@ -1,5 +1,6 @@
 {
     "name": "water",
+    "num_wann": 256,
     "dft_type": "qe_cp",
     "dft_params": {
         "qe_params": {
@@ -9,7 +10,7 @@
                 "restart_mode"  : "from_scratch",
                 "prefix"        : "h2o",
                 "outdir"        : "out",
-                "nstep"         : 300,
+                "nstep"         : 200,
                 "iprint"        : 100,
                 "isave"         : 50,
                 "dt"            : 4.0,
@@ -19,7 +20,7 @@
             "system": {
                 "ecutwfc": 50,
                 "nosym": true,
-                "input_dft": "PBE0",
+                "input_dft": "PBE",
                 "vdw_corr" : "TS",
                 "ibrav": 0
             },

@@ -3,7 +3,7 @@ from mlwf_op.collect_wfc_op import CollectWFC
 import numpy as np
 from pathlib import Path
 
-class CollectWann(CollectWFC):
+class CollectCPWF(CollectWFC):
     a0 = 0.5291772083
     def init_params(self, input_setting: dict, backward: List[Path]):
         self.prefix = input_setting["dft_params"]["qe_params"]["control"]["prefix"]
