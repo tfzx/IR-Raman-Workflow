@@ -79,13 +79,8 @@ class RunMLWF(OP, abc.ABC):
         shutil.copy(self.log_path, backward_dir)
 
     def run(self, *args, **kwargs):
-        if_print = True
-        if "if_print" in kwargs:
-            if_print = kwargs["if_print"]
-            del kwargs["if_print"]
+        kwargs["prinf_oe"] = True
         ret, out, err = run_command(*args, **kwargs)
-        if if_print:
-            print(out)
         # Save log here.
         with self.log_path.open(mode = "a") as fp:
             fp.write(out)
