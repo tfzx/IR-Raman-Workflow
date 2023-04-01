@@ -11,6 +11,8 @@ from dflow import (
 from ir_wf.dipole_steps import DipoleSteps
 from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
 from mlwf_op.collect_wannier90 import CollectWann
+from pp_op.wannier_centroid_op import CalWC
+from mlwf_op.mlwf_steps import MLWFSteps
 
 
 def bohrium_login():
@@ -62,7 +64,7 @@ run_executor = DispatcherExecutor(
         },
     },
 )
-cal_executor = DispatcherExecutor(
+wc_executor = DispatcherExecutor(
     machine_dict={
         "batch_type": "Bohrium",
         "context_type": "Bohrium",
@@ -76,18 +78,25 @@ cal_executor = DispatcherExecutor(
         },
     },
 )
-steps = DipoleSteps(
-    name = "calculate-dipole-qe",
+
+mlwf_template = MLWFSteps(
+    name = "MLWF",
     prepare_op = PrepareQeWann,
     run_op = RunQeWann,
     collect_op = CollectWann,
     prepare_executor = prepare_executor,
-    run_executor = run_executor,
-    cal_executor = cal_executor
+    run_executor = run_executor
+)
+
+steps = DipoleSteps(
+    name = "Dipole-qe",
+    mlwf_template = mlwf_template,
+    wc_op = CalWC,
+    wc_executor = wc_executor
 )
 
 cal_dipole_step = Step(
-    name = "calculate-dipole-step",
+    name = "Dipole-Step",
     template = steps,
     parameters = {
         "input_setting": input_setting,
@@ -106,7 +115,7 @@ while wf.query_status() in ["Pending", "Running"]:
     time.sleep(1)
 assert(wf.query_status() == "Succeeded")
 
-step = wf.query_step("calculate-dipole-step")[0]
+step = wf.query_step("Dipole-Step")[0]
 download_artifact(step.outputs.artifacts["backward"], path="./back")
 download_artifact(step.outputs.artifacts["wannier_function_centers"], path="./back")
 download_artifact(step.outputs.artifacts["wannier_centroid"], path="./data")
