@@ -35,10 +35,11 @@ class CollectWFC(OP, abc.ABC):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        self.name: str = op_in["input_setting"]["name"]
+        input_setting: dict = op_in["input_setting"]
         self.confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
         backward: List[Path] = op_in["backward"]
 
+        self.init_params(input_setting, backward)
         wfc = self.collect_wfc(backward)
         wfc_path = Path("wfc.raw")
         np.savetxt(wfc_path, wfc, fmt = "%15.8f")
@@ -49,13 +50,23 @@ class CollectWFC(OP, abc.ABC):
     def collect_wfc(self, backward: List[Path]) -> np.ndarray:
         if not backward:
             return np.array([])
-        num_wann = int(np.loadtxt(backward[0] / f'{self.name}_centres.xyz', dtype = int, max_rows = 1)) - self.confs.get_natoms()
-        wc = np.zeros((len(backward), num_wann * 3), dtype = float)
+        wc = np.zeros((len(backward), self.num_wann * 3), dtype = float)
         for frame, p in enumerate(backward):
             with set_directory(p):
-                wc[frame] = self.get_one_frame(frame, num_wann).flatten()
+                wc[frame] = self.get_one_frame(frame).flatten()
         return wc
 
     @abc.abstractmethod
-    def get_one_frame(self, frame: int, num_wann: int) -> np.ndarray:
+    def get_one_frame(self, frame: int) -> np.ndarray:
+        pass
+
+    @abc.abstractmethod
+    def init_params(self, input_setting: dict, backward: List[Path]):
+        try:
+            self.num_wann = input_setting["num_wann"]
+        except KeyError:
+            self.num_wann = self.get_num_wann(backward[0])
+
+    @abc.abstractmethod
+    def get_num_wann(self, file_path: Path) -> int:
         pass
