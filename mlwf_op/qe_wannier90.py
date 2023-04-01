@@ -35,7 +35,9 @@ class PrepareQeWann(Prepare):
         self.run_nscf = input_setting["dft_params"]["cal_type"] == "scf+nscf"
 
         k_grid = input_setting["dft_params"]["k_grid"]
-        qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS, if_copy = True)
+        qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
+        if "num_wann" in input_setting["wannier90_params"]["wan_params"]:
+            input_setting["num_wann"] = input_setting["wannier90_params"]["wan_params"]["num_wann"]
 
         input_scf, kpoints_scf = complete_qe(qe_params, "scf", k_grid, confs)
         self.scf_writer = QeParamsConfs(input_scf, kpoints_scf, input_setting["dft_params"]["atomic_species"], confs)
@@ -55,7 +57,7 @@ class PrepareQeWann(Prepare):
             input_setting["dft_params"]["k_grid"]
         )
         self.wannier90_writer = Wannier90Inputs(wan_params, proj, kpoints, confs)
-        return super().init_inputs(input_setting, confs)
+        return input_setting
 
     def write_one_frame(self, frame: int):
         Path("scf.in").write_text(self.scf_writer.write(frame))

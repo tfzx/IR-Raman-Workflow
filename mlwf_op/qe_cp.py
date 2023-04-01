@@ -22,10 +22,10 @@ class PrepareCP(Prepare):
     
     def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
         self.name = input_setting["name"]
-        qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS, if_copy = True)
+        qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
         input_cp, _ = complete_qe(qe_params, "cp-wf", None, confs)
         self.cp_writer = QeParamsConfs(input_cp, None, input_setting["dft_params"]["atomic_species"], confs)
-        return super().init_inputs(input_setting, confs)
+        return input_setting
 
     def write_one_frame(self, frame: int):
         Path(f"cp_{self.name}.in").write_text(self.cp_writer.write(frame))

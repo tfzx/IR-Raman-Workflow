@@ -33,6 +33,7 @@ class Prepare(OP, abc.ABC):
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
+            "input_setting": BigParameter(dict),
             "task_path": Artifact(List[Path], archive=None),
             "frames_list": BigParameter(List[Tuple[int]])
         })
@@ -47,9 +48,10 @@ class Prepare(OP, abc.ABC):
         confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
         pseudo: Path = op_in["pseudo"]
 
-        self.init_inputs(input_setting, confs)
+        input_setting = self.init_inputs(input_setting, confs)
         task_path, frames_list = self._exec_all(confs, pseudo, group_size)
         return OPIO({
+            "input_setting": input_setting,
             "task_path": task_path,
             "frames_list": frames_list
         })
@@ -76,7 +78,7 @@ class Prepare(OP, abc.ABC):
         return task_path, frames_list
 
     @abc.abstractmethod
-    def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
+    def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System) -> Dict[str, Union[str, dict]]:
         pass
 
     @abc.abstractmethod
