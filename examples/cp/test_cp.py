@@ -22,6 +22,7 @@ def bohrium_login():
     from getpass import getpass
     config["host"] = "https://workflows.deepmodeling.com"
     config["k8s_api_server"] = "https://workflows.deepmodeling.com"
+    config["dispatcher_image_pull_policy"] = "IfNotPresent"
     with open("./account_config.json", "r") as f:
         account = json.load(f)
     # bohrium.config["username"] = input("Bohrium username: ")
