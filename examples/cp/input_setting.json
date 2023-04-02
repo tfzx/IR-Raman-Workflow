@@ -1,6 +1,5 @@
 {
     "name": "water",
-    "num_wann": 256,
     "dft_type": "qe_cp",
     "dft_params": {
         "qe_params": {

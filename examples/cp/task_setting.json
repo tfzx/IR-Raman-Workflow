@@ -1,5 +1,7 @@
 {
     "group_size": 2,
+    "data_path": "./data",
+    "pseudo_path": "./pseudo",
     "commands": {
         "cp": "mpirun -n 64 cp.x"
     },

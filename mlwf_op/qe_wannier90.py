@@ -1,4 +1,4 @@
-from typing import Dict, Union
+from typing import Dict, List, Union
 from pathlib import Path
 import dpdata, time
 from dflow.plugins.dispatcher import DispatcherExecutor
@@ -12,9 +12,11 @@ from dflow.python import (
     PythonOPTemplate,
 )
 from mlwf_op.prepare_input_op import Prepare
+from mlwf_op.prepare_polar_op import PreparePolar
 from mlwf_op.run_mlwf_op import RunMLWF
 from mlwf_op.inputs import QeParamsConfs, QeParams, Wannier90Inputs, complete_qe, complete_wannier90, complete_pw2wan
 from mlwf_op.utils import complete_by_default
+from copy import deepcopy
 
 
 class PrepareQeWann(Prepare):
@@ -89,3 +91,25 @@ class RunQeWann(RunMLWF):
         backward_dir = Path(self.backward_dir_name)
         backward_dir.mkdir()
         return backward_dir
+
+class PreparePolarQe(PreparePolar):
+    def __init__(self):
+        super().__init__()
+
+    def generate_inputs(self, input_setting: Dict[str, Union[str, dict]]) -> List[Dict[str, Union[str, dict]]]:
+        input_setting_list = []
+        inputs = deepcopy(input_setting)
+        inputs["dft_params"]["qe_params"]["electrons"].update({
+                "efield_cart(1)": -0.001,
+                "efield_cart(2)": 0.0,
+                "efield_cart(3)": 0.0
+        })
+        input_setting_list.append(inputs)
+        inputs = deepcopy(input_setting)
+        inputs["dft_params"]["qe_params"]["electrons"].update({
+                "efield_cart(1)": 0.001,
+                "efield_cart(2)": 0.0,
+                "efield_cart(3)": 0.0
+        })
+        input_setting_list.append(inputs)
+        return input_setting_list
