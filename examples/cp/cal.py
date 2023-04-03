@@ -9,8 +9,7 @@ from dflow import (
     download_artifact
 )
 from ir_wf.dipole_steps import DipoleSteps
-from mlwf_op.qe_cp import PrepareCP, RunCPWF
-from mlwf_op.collect_cpwf import CollectCPWF
+from mlwf_op.qe_cp import PrepareCP, RunCPWF, CollectCPWF
 from pp_op.wannier_centroid_op import CalWC
 from mlwf_op.mlwf_steps import MLWFSteps
 

@@ -1,19 +1,10 @@
 from typing import Dict, List, Union
 from pathlib import Path
-import dpdata, time
-from dflow.plugins.dispatcher import DispatcherExecutor
-from dflow import (
-    Step, 
-    Workflow,
-    upload_artifact,
-    download_artifact
-)
-from dflow.python import (
-    PythonOPTemplate,
-)
+import dpdata, numpy as np
 from mlwf_op.prepare_input_op import Prepare
-from mlwf_op.prepare_polar_op import PreparePolar
 from mlwf_op.run_mlwf_op import RunMLWF
+from mlwf_op.collect_wfc_op import CollectWFC
+from mlwf_op.prepare_polar_op import PreparePolar
 from mlwf_op.inputs import QeParamsConfs, QeParams, Wannier90Inputs, complete_qe, complete_wannier90, complete_pw2wan
 from mlwf_op.utils import complete_by_default
 from copy import deepcopy
@@ -91,6 +82,18 @@ class RunQeWann(RunMLWF):
         backward_dir = Path(self.backward_dir_name)
         backward_dir.mkdir()
         return backward_dir
+
+class CollectWann(CollectWFC):
+    def get_one_frame(self, frame: int) -> np.ndarray:
+        return np.loadtxt(f'{self.name}_centres.xyz', dtype = float, skiprows = 2, usecols = [1, 2, 3], max_rows = self.num_wann)
+    
+    def init_params(self, input_setting: dict, backward: List[Path]):
+        self.name = input_setting["name"]
+        return super().init_params(input_setting, backward)
+
+    def get_num_wann(self, file_path: Path) -> int:
+        num_wann = int(np.loadtxt(file_path / f'{self.name}_centres.xyz', dtype = int, max_rows = 1)) - self.confs.get_natoms()
+        return num_wann
 
 class PreparePolarQe(PreparePolar):
     def __init__(self):

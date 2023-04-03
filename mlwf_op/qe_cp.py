@@ -1,9 +1,10 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Union
 from pathlib import Path
-from mlwf_op.run_mlwf_op import RunMLWF
-import dpdata
+import dpdata, numpy as np
 from mlwf_op.prepare_input_op import Prepare
-from mlwf_op.inputs import QeParamsConfs, QeParams, Wannier90Inputs, complete_qe, complete_wannier90, complete_pw2wan
+from mlwf_op.run_mlwf_op import RunMLWF
+from mlwf_op.collect_wfc_op import CollectWFC
+from mlwf_op.inputs import QeParamsConfs, complete_qe
 from mlwf_op.utils import complete_by_default
 
 
@@ -44,3 +45,32 @@ class RunCPWF(RunMLWF):
         backward_dir = Path(self.backward_dir_name)
         backward_dir.mkdir()
         return backward_dir
+
+class CollectCPWF(CollectWFC):
+    a0 = 0.5291772083
+    def init_params(self, input_setting: dict, backward: List[Path]):
+        self.prefix = input_setting["dft_params"]["qe_params"]["control"]["prefix"]
+        return super().init_params(input_setting, backward)
+
+    def get_num_wann(self, file_path: Path) -> int:
+        start = False
+        num_wann = 0
+        with open(file_path / f"{self.prefix}.wfc", "r") as fp:
+            for line in fp.readlines():
+                line = line.strip()
+                if not line:
+                    break
+                if len(line.split()) > 3:
+                    if start:
+                        break
+                    else:
+                        start = True
+                elif start:
+                    num_wann += 1
+        return num_wann
+
+    def get_one_frame(self, frame: int) -> np.ndarray:
+        with open(f"{self.prefix}.wfc", "r") as fp:
+            while fp.readline().strip():
+                wann = np.loadtxt(fp, dtype = float, max_rows = self.num_wann)
+        return wann * self.a0

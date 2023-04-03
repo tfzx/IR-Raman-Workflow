@@ -9,8 +9,7 @@ from dflow import (
     download_artifact
 )
 from ir_wf.dipole_steps import DipoleSteps
-from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
-from mlwf_op.collect_wannier90 import CollectWann
+from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann, CollectWann
 from pp_op.wannier_centroid_op import CalWC
 from mlwf_op.mlwf_steps import MLWFSteps
 
