@@ -9,7 +9,9 @@ class TestWC(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.confs = Path("tests/data.qe/test.002/data").absolute()
-        self.wfc = Path("tests/data.qe/test.002/back/wfc.raw").absolute()
+        self.wfc = {
+            "ori": Path("tests/data.qe/test.002/back/wfc.raw").absolute()
+        }
         self.work_dir = Path("tests/tmp")
         self.work_dir.mkdir()
         self.last_cwd = os.getcwd()
@@ -28,5 +30,5 @@ class TestWC(unittest.TestCase):
             "wannier_function_centers": self.wfc
         }
         op_out = wc_op.execute(op_in)
-        wc = np.loadtxt(op_out["wannier_centroid"], dtype = float)
+        wc = np.loadtxt(op_out["wannier_centroid"]["ori"], dtype = float)
         self.assertTupleEqual(wc.shape, (10, 64 * 3))

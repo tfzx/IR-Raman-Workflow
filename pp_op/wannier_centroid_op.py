@@ -21,13 +21,13 @@ class CalWC(OP):
     def get_input_sign(cls):
         return OPIOSign({
             "confs": Artifact(Path),
-            "wannier_function_centers": Artifact(Path),
+            "wannier_function_centers": Artifact(Dict[str, Path]),
         })
 
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "wannier_centroid": Artifact(Path)
+            "wannier_centroid": Artifact(Dict[str, Path])
         })
 
     @OP.exec_sign_check
@@ -36,13 +36,16 @@ class CalWC(OP):
             op_in: OPIO,
     ) -> OPIO:
         confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
-        wfc = np.loadtxt(op_in["wannier_function_centers"], dtype = float)
-
-        wc = self.cal_wc(confs, wfc)
-        wc_path = Path("atomic_dipole.raw")
-        np.savetxt(wc_path, wc, fmt = "%15.8f")
+        wfc_d = op_in["wannier_function_centers"]
+        wc_d = {}
+        for key in wfc_d:
+            wfc = np.loadtxt(wfc_d[key], dtype = float)
+            wc = self.cal_wc(confs, wfc)
+            wc_path = Path(f"wc_{key}.raw")
+            np.savetxt(wc_path, wc, fmt = "%15.8f")
+            wc_d[key] = wc_path
         return OPIO({
-            "wannier_centroid": wc_path
+            "wannier_centroid": wc_d
         })
     
     def cal_wc(self, confs: dpdata.System, wfc: np.ndarray) -> np.ndarray:

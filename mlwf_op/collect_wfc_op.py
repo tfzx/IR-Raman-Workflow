@@ -27,7 +27,7 @@ class CollectWFC(OP, abc.ABC):
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "wannier_function_centers": Artifact(Path)
+            "wannier_function_centers": Artifact(Dict[str, Path])
         })
 
     @OP.exec_sign_check
@@ -39,22 +39,24 @@ class CollectWFC(OP, abc.ABC):
         self.confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
         backward: List[Path] = op_in["backward"]
 
-        self.init_params(input_setting, backward)
-        wfc = self.collect_wfc(backward)
-        wfc_path = Path("wfc.raw")
-        np.savetxt(wfc_path, wfc, fmt = "%15.8f")
+        wfc = self.collect_wfc(input_setting, backward)
         return OPIO({
-            "wannier_function_centers": wfc_path
+            "wannier_function_centers": wfc
         })
     
-    def collect_wfc(self, backward: List[Path]) -> np.ndarray:
+    def collect_wfc(self, input_setting: dict, backward: List[Path]) -> Dict[str, Path]:
         if not backward:
             return np.array([])
-        wc = np.zeros((len(backward), self.num_wann * 3), dtype = float)
+        self.init_params(input_setting, backward)
+        wfc = np.zeros((len(backward), self.num_wann * 3), dtype = float)
         for frame, p in enumerate(backward):
             with set_directory(p):
-                wc[frame] = self.get_one_frame(frame).flatten()
-        return wc
+                wfc[frame] = self.get_one_frame(frame).flatten()
+        wfc_path = Path("wfc.raw")
+        np.savetxt(wfc_path, wfc, fmt = "%15.8f")
+        return {
+            "ori": wfc_path
+        }
 
     @abc.abstractmethod
     def get_one_frame(self, frame: int) -> np.ndarray:
