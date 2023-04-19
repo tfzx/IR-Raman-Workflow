@@ -17,7 +17,6 @@ from dflow.python import (
 )
 import mlwf_op, pp_op
 from mlwf_op.mlwf_steps import MLWFSteps
-from mlwf_op.prepare_polar_op import PreparePolar
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
 # from mlwf_op.collect_wfc_op import CollectWFC

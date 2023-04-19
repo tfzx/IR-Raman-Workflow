@@ -1,10 +1,10 @@
-from typing import Dict, List, Union
+import shutil
+from typing import Dict, List, Optional, Union
 from pathlib import Path
 import dpdata, numpy as np
 from mlwf_op.prepare_input_op import Prepare
 from mlwf_op.run_mlwf_op import RunMLWF
 from mlwf_op.collect_wfc_op import CollectWFC
-from mlwf_op.prepare_polar_op import PreparePolar
 from mlwf_op.inputs import QeParamsConfs, QeParams, Wannier90Inputs, complete_qe, complete_wannier90, complete_pw2wan
 from mlwf_op.utils import complete_by_default
 from copy import deepcopy
@@ -28,6 +28,7 @@ class PrepareQeWann(Prepare):
         self.run_nscf = input_setting["dft_params"]["cal_type"] == "scf+nscf"
 
         k_grid = input_setting["dft_params"]["k_grid"]
+        self.DEFAULT_PARAMS["control"]["prefix"] = self.name
         qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
         if "num_wann" in input_setting["wannier90_params"]["wan_params"]:
             input_setting["num_wann"] = input_setting["wannier90_params"]["wan_params"]["num_wann"]
@@ -76,11 +77,12 @@ class RunQeWann(RunMLWF):
         if Path("nscf.in").exists():
             self.run(" ".join([self.pw_cmd, "-input", "nscf.in"]))
         self.run(" ".join([self.wannier90_pp_cmd, "-pp", self.name]))
-        self.run(" ".join(["mpirun -n 2 pw2wannier90.x"]), input=Path(f"{self.name}.pw2wan").read_text())
+        self.run(" ".join([self.pw2wan_cmd]), input=Path(f"{self.name}.pw2wan").read_text())
         self.run(" ".join([self.wannier_cmd, self.name]))
-        self.run("rm -rf out", if_print = False)
+        self.run("rm -rf out")
         backward_dir = Path(self.backward_dir_name)
         backward_dir.mkdir()
+        shutil.copy(f"{self.name}_centres.xyz", backward_dir)
         return backward_dir
 
 class CollectWann(CollectWFC):
@@ -94,25 +96,3 @@ class CollectWann(CollectWFC):
     def get_num_wann(self, file_path: Path) -> int:
         num_wann = int(np.loadtxt(file_path / f'{self.name}_centres.xyz', dtype = int, max_rows = 1)) - self.confs.get_natoms()
         return num_wann
-
-class PreparePolarQe(PreparePolar):
-    def __init__(self):
-        super().__init__()
-
-    def generate_inputs(self, input_setting: Dict[str, Union[str, dict]]) -> List[Dict[str, Union[str, dict]]]:
-        input_setting_list = []
-        inputs = deepcopy(input_setting)
-        inputs["dft_params"]["qe_params"]["electrons"].update({
-                "efield_cart(1)": -0.001,
-                "efield_cart(2)": 0.0,
-                "efield_cart(3)": 0.0
-        })
-        input_setting_list.append(inputs)
-        inputs = deepcopy(input_setting)
-        inputs["dft_params"]["qe_params"]["electrons"].update({
-                "efield_cart(1)": 0.001,
-                "efield_cart(2)": 0.0,
-                "efield_cart(3)": 0.0
-        })
-        input_setting_list.append(inputs)
-        return input_setting_list
