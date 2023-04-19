@@ -1,5 +1,6 @@
 import numpy as np
 from copy import deepcopy
+import dpdata
 
 def kmesh(nx: int, ny: int, nz: int):
     kx = (np.arange(nx) / nx).reshape(-1, 1) * np.array([1, 0, 0])
@@ -22,35 +23,27 @@ def complete_by_default(params: dict, params_default: dict, if_copy: bool = Fals
                 params[key] = params_default[key]
     return params
 
-if __name__ == "__main__":
-    p = {
-        "a": {
-            "11": 1,
-            "22": 2
-        },
-        "b": [123],
-        "c": {
+def box_shift(dx: np.ndarray, box: np.ndarray):
+    nl = np.floor(dx / (box / 2))
+    return dx - (nl + (nl + 2) % 2) * box / 2
 
-        }
-    }
-    p_d = {
-        "a": {
-            "11": 2,
-            "33": 3,
-            "44": {
-                "55": 5,
-                "66": {
-                    "77": 7
-                }
-            }
-        },
-        "b": {
-            "123": 123
-        },
-        "c": {
-            "123": 123
-        }
-    }
-    p_copy = complete_by_default(p, p_d, True)
-    print(p)
-    print(p_copy)
+def _check_coords(coords: np.ndarray, box: np.ndarray, eps: float) -> bool:
+    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], box[..., np.newaxis, np.newaxis, :])
+    mask = np.linalg.norm(delta, 2, axis = -1) < eps
+    np.fill_diagonal(mask, False)
+    return not mask.any()
+
+def check_coords(coords: np.ndarray, box: np.ndarray, eps: float):
+    c = np.concatenate([coords, box[..., np.newaxis, :]], axis = -2).reshape(coords.shape[0], -1)
+    def check(arr: np.ndarray):
+        arr = arr.reshape(-1, 3)
+        c = arr[:-1]
+        b = arr[-1]
+        return _check_coords(c, b, eps)
+    return np.apply_along_axis(check, axis = -1, arr = c)
+
+def filter_confs(confs: dpdata.System, tensor: np.ndarray):
+    mask = check_coords(confs["coords"], confs["cells"].diagonal(offset = 0, axis1 = 1, axis2 = 2), eps = 1e-3)
+    confs = confs[mask]
+    tensor = tensor[mask, ...]
+    return confs, tensor
