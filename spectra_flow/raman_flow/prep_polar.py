@@ -17,7 +17,7 @@ import dpdata
 
 
 
-class PreparePolar(OP, abc.ABC):
+class PrepPolar(OP, abc.ABC):
     def __init__(self):
         pass
 

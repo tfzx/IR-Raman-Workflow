@@ -16,8 +16,8 @@ from dflow.python import (
 )
 import spectra_flow
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
-from spectra_flow.raman_flow.prepare_polar import PreparePolar
-from spectra_flow.raman_flow.polarizability_op import CalPolar
+from spectra_flow.raman_flow.prep_polar import PrepPolar
+from spectra_flow.raman_flow.post_polar import CalPolar
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
 # from mlwf_op.collect_wfc_op import CollectWFC
@@ -84,7 +84,7 @@ class PolarSteps(Steps):
         prep_polar = Step(
             name = "prep-polar",
             template = PythonOPTemplate(
-                PreparePolar, 
+                PrepPolar, 
                 python_packages = upload_python_packages
             ),
             parameters = {
