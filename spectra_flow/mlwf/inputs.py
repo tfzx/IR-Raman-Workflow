@@ -4,7 +4,7 @@ from copy import deepcopy
 from tempfile import TemporaryFile
 import dpdata
 import abc
-from spectra_flow.mlwf.utils import kmesh, complete_by_default
+from spectra_flow.utils import kmesh, complete_by_default
 
 class QeInputs(abc.ABC):
     def __init__(self) -> None:

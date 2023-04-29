@@ -5,7 +5,7 @@ from spectra_flow.mlwf.prepare_input_op import Prepare
 from spectra_flow.mlwf.run_mlwf_op import RunMLWF
 from spectra_flow.mlwf.collect_wfc_op import CollectWFC
 from spectra_flow.mlwf.inputs import QeParamsConfs, QeParams, Wannier90Inputs, complete_qe, complete_wannier90, complete_pw2wan
-from spectra_flow.mlwf.utils import complete_by_default
+from spectra_flow.utils import complete_by_default
 from copy import deepcopy
 from dflow.utils import set_directory
 
