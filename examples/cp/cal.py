@@ -8,10 +8,10 @@ from dflow import (
     upload_artifact,
     download_artifact
 )
-from ir_wf.dipole_steps import DipoleSteps
-from mlwf_op.qe_cp import PrepareCP, RunCPWF, CollectCPWF
-from pp_op.wannier_centroid_op import CalWC
-from mlwf_op.mlwf_steps import MLWFSteps
+from spectra_flow.ir_flow.dipole_steps import DipoleSteps
+from spectra_flow.mlwf.qe_cp import PrepareCP, RunCPWF, CollectCPWF
+from spectra_flow.post.wannier_centroid_op import CalWC
+from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 
 
 def bohrium_login():

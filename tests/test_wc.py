@@ -1,4 +1,4 @@
-from pp_op.wannier_centroid_op import CalWC
+from spectra_flow.post.wannier_centroid_op import CalWC
 import unittest, shutil, os, numpy as np
 from pathlib import Path
 from dflow.python import (

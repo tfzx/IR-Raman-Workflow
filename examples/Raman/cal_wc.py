@@ -13,9 +13,9 @@ from dflow.python import (
     Slices,
     upload_packages
 )
-import pp_op
-from pp_op.wannier_centroid_op import CalWC
-upload_packages += pp_op.__path__
+import spectra_flow
+from spectra_flow.post.wannier_centroid_op import CalWC
+upload_packages += spectra_flow.__path__
 
 def bohrium_login():
     from dflow import config, s3_config

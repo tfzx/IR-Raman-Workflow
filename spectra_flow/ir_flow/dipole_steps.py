@@ -15,8 +15,8 @@ from dflow.python import (
     Slices,
     OP
 )
-import mlwf_op, pp_op
-from mlwf_op.mlwf_steps import MLWFSteps
+import spectra_flow
+from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
 # from mlwf_op.collect_wfc_op import CollectWFC
@@ -56,7 +56,7 @@ class DipoleSteps(Steps):
             )
         )
         if not upload_python_packages:
-            upload_python_packages = mlwf_op.__path__ + pp_op.__path__
+            upload_python_packages = spectra_flow.__path__
         self.build_steps(
             mlwf_template, 
             wc_op,

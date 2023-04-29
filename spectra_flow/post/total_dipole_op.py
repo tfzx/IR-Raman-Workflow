@@ -11,8 +11,8 @@ from dflow.python import (
 from dflow.utils import (
     set_directory
 )
-from pp_op.cal_wannier_centroid import cal_wc_h2o
-from pp_op.cal_dipole import calculate_dipole_h2o
+from spectra_flow.post.cal_wannier_centroid import cal_wc_h2o
+from spectra_flow.post.cal_dipole import calculate_dipole_h2o
 
 class CalTotalDipole(OP):
     def __init__(self) -> None:

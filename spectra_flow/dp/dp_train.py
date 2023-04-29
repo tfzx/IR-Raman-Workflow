@@ -12,7 +12,7 @@ from dflow.utils import (
     set_directory,
     run_command
 )
-from mlwf_op.utils import filter_confs
+from spectra_flow.mlwf.utils import filter_confs
 
 class DPTrain(OP):
     def __init__(self) -> None:

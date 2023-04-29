@@ -12,7 +12,7 @@ from dflow.utils import (
     set_directory,
     run_command
 )
-from dp_op.infer import model_eval
+from spectra_flow.dp.infer import model_eval
 
 class DPolarPredict(OP):
     def __init__(self) -> None:

@@ -1,11 +1,11 @@
 from typing import Dict, List, Union
 from pathlib import Path
 import dpdata, numpy as np
-from mlwf_op.prepare_input_op import Prepare
-from mlwf_op.run_mlwf_op import RunMLWF
-from mlwf_op.collect_wfc_op import CollectWFC
-from mlwf_op.inputs import QeParamsConfs, complete_qe
-from mlwf_op.utils import complete_by_default
+from spectra_flow.mlwf.prepare_input_op import Prepare
+from spectra_flow.mlwf.run_mlwf_op import RunMLWF
+from spectra_flow.mlwf.collect_wfc_op import CollectWFC
+from spectra_flow.mlwf.inputs import QeParamsConfs, complete_qe
+from spectra_flow.mlwf.utils import complete_by_default
 
 
 class PrepareCP(Prepare):

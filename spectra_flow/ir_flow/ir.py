@@ -11,7 +11,7 @@ from dflow.python import (
 from dflow.utils import (
     set_directory
 )
-from ir_wf.cal_ir import calculate_corr, calculate_ir
+from spectra_flow.ir_flow.cal_ir import calculate_corr, calculate_ir
 
 class IR(OP):
     def __init__(self) -> None:

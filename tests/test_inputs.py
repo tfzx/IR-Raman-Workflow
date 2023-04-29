@@ -1,4 +1,4 @@
-from mlwf_op.inputs import complete_qe
+from spectra_flow.mlwf.inputs import complete_qe
 import unittest, shutil, os, dpdata
 from pathlib import Path
 from dflow.python import (

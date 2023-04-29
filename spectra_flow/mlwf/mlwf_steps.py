@@ -15,7 +15,7 @@ from dflow.python import (
     Slices,
     OP
 )
-import mlwf_op, pp_op
+import spectra_flow
 
 class MLWFSteps(Steps):
     def __init__(self, 
@@ -52,7 +52,7 @@ class MLWFSteps(Steps):
             )
         )
         if not upload_python_packages:
-            upload_python_packages = mlwf_op.__path__ + pp_op.__path__
+            upload_python_packages = spectra_flow.__path__
         if not collect_executor:
             collect_executor = prepare_executor
         self.build_steps(
