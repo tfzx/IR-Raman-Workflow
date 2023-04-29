@@ -39,7 +39,7 @@ class CalWC(OP):
         wfc_d = op_in["wannier_function_centers"]
         wc_d = {}
         for key in wfc_d:
-            wfc = np.loadtxt(wfc_d[key], dtype = float)
+            wfc = np.loadtxt(wfc_d[key], dtype = float, ndmin = 2)
             wc = self.cal_wc(confs, wfc)
             wc_path = Path(f"wc_{key}.raw")
             np.savetxt(wc_path, wc, fmt = "%15.8f")
