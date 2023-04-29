@@ -97,7 +97,7 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int = None):
         A = A.reshape(-1, 1)
         B = B.reshape(-1, 1)
     if not n:
-        n = min(A.shape[0], B.shape[0])
+        n = min(A.shape[0], B.shape[0]) - window
     assert n <= min(A.shape[0], B.shape[0]), "The number of steps is too large!"
     v1 = np.concatenate([A[:n][::-1], np.zeros([window, A.shape[1]], dtype = np.float32)], axis = 0)
     v2 = B[:n + window]
