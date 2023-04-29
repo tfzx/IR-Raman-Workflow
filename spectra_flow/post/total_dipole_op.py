@@ -8,11 +8,8 @@ from dflow.python import (
     OPIOSign, 
     BigParameter,
 )
-from dflow.utils import (
-    set_directory
-)
-from spectra_flow.post.cal_wannier_centroid import cal_wc_h2o
 from spectra_flow.post.cal_dipole import calculate_dipole_h2o
+from spectra_flow.utils import read_conf
 
 class CalTotalDipole(OP):
     def __init__(self) -> None:
@@ -22,6 +19,7 @@ class CalTotalDipole(OP):
     def get_input_sign(cls):
         return OPIOSign({
             "confs": Artifact(Path),
+            "conf_fmt": BigParameter(dict),
             "wannier_centroid": Artifact(Path),
         })
 
@@ -36,7 +34,8 @@ class CalTotalDipole(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        confs = dpdata.System(op_in["confs"], fmt='deepmd/npy', type_map = ['O', 'H'])
+        conf_fmt: dict = op_in["conf_fmt"]
+        confs = read_conf(op_in["confs"], conf_fmt)
         wc = np.load(op_in["wannier_centroid"])
         dipole = self.cal_dipole(confs, wc)
         dipole_path = Path(f"total_dipole.npy")

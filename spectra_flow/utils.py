@@ -1,7 +1,8 @@
-from typing import Tuple
+from typing import Dict, List, Tuple, Union
 import numpy as np
 from copy import deepcopy
 import dpdata
+from pathlib import Path
 
 def kmesh(nx: int, ny: int, nz: int):
     kx = (np.arange(nx) / nx).reshape(-1, 1) * np.array([1, 0, 0])
@@ -23,6 +24,38 @@ def complete_by_default(params: dict, params_default: dict, if_copy: bool = Fals
             if key not in params:
                 params[key] = params_default[key]
     return params
+
+def conf_from_npz(raw_conf, type_map: List[str] = None):
+    conf_data = dict(raw_conf)
+    types = conf_data["atom_types"]
+    ntyp = np.max(types) + 1
+    conf_data["atom_numbs"] = [int(np.sum(types == i)) for i in range(ntyp)]
+    conf_data["atom_names"] = type_map if type_map is not None else [str(i) for i in range(ntyp)]
+    conf_data["orig"] = np.array([0, 0, 0])
+    return dpdata.System(data = conf_data)
+
+def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
+    fmt: str = conf_fmt.get("fmt", "")
+    type_map = conf_fmt.get("type_map", None)
+    fmt = fmt.strip()
+    if fmt:
+        head = fmt.split("/")[0]
+        if head == "numpy":
+            conf = conf_from_npz(np.load(conf_path), type_map)
+        else:
+            conf = dpdata.System(conf_path, fmt = fmt)
+    else:
+        try:
+            conf = dpdata.System(conf_path, fmt = "deepmd/raw")
+        except NotImplementedError:
+            try:
+                conf = dpdata.System(conf_path, fmt = "deepmd/npy")
+            except NotImplementedError:
+                try:
+                    conf = dpdata.System(conf_path)
+                except NotImplementedError:
+                    conf = conf_from_npz(np.load(conf_path), type_map)
+    return conf
 
 def box_shift(dx: np.ndarray, box: np.ndarray):
     nl = np.floor(dx / (box / 2))
