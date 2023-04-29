@@ -78,3 +78,13 @@ class DPTrain(OP):
             run_command(f"dp freeze -o {self.dp_type}.pb")
             model = Path(f"{self.dp_type}.pb").absolute()
         return model
+
+class DWannTrain(DPTrain):
+    def __init__(self) -> None:
+        super().__init__()
+        self.dp_type = "dipole"
+
+class DPolarTrain(DPTrain):
+    def __init__(self) -> None:
+        super().__init__()
+        self.dp_type = "polar"
