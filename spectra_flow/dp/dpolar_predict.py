@@ -21,6 +21,7 @@ class DPolarPredict(OP):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
+            "dp_setting": BigParameter(Dict),
             "sampled_system": Artifact(Path),
             "frozen_model": Artifact(Path),
         })
@@ -36,13 +37,27 @@ class DPolarPredict(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        # TODO: system format!!!
-        smp_sys = np.load(op_in["sampled_system"])
+        sys_path: Path = op_in["sampled_system"]
+        dp_setting = op_in["dp_setting"]
+        if "dump_fmt" in dp_setting:
+            dump_fmt: str = dp_setting["dump_fmt"]
+            dump_fmt = dump_fmt.strip()
+            head = dump_fmt.split("/")[0]
+            if head == "numpy":
+                smp_sys = np.load(sys_path)
+            else:
+                smp_sys = dpdata.System(op_in["sampled_system"], fmt = dump_fmt)
+        else:
+            if sys_path.is_file():
+                smp_sys = np.load(sys_path)
+            else:
+                smp_sys = dpdata.System(op_in["sampled_system"])
+            
         from deepmd.infer import DeepPolar
         deep_polar = DeepPolar(op_in["frozen_model"])
         predicted_polar = model_eval(deep_polar, smp_sys)
         polar_path = Path("predicted_polar.raw")
-        np.savetxt(polar_path, predicted_polar, fmt = "%15.8f")
+        np.save(polar_path, predicted_polar)
         return OPIO({
             "predicted_polar": polar_path
         })

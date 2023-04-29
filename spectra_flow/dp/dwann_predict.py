@@ -37,7 +37,6 @@ class DWannPredict(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        # TODO: system format!!!
         sys_path: Path = op_in["sampled_system"]
         dp_setting = op_in["dp_setting"]
         if "dump_fmt" in dp_setting:
