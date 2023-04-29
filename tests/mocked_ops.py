@@ -1,5 +1,6 @@
 from typing import Dict, List, Tuple, Union
 from mlwf_op.prepare_input_op import Prepare
+from mlwf_op.run_mlwf_op import RunMLWF
 from pathlib import Path
 import dpdata, os
 
@@ -14,3 +15,10 @@ class MockedPrepare(Prepare):
         self.conf_path.append(cwd.name)
         self.task_path.append(cwd.parent.name)
         return super().write_one_frame(frame)
+
+class MockedRunMLWF(RunMLWF):
+    def init_cmd(self, commands: Dict[str, str]):
+        return super().init_cmd(commands)
+
+    def run_one_frame(self) -> Path:
+        return super().run_one_frame()
