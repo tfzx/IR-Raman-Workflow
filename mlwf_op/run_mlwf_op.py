@@ -80,13 +80,13 @@ class RunMLWF(OP, abc.ABC):
         shutil.copy(self.log_path, backward_dir)
 
     def run(self, *args, **kwargs):
-        kwargs["print_oe"] = False
-        kwargs["raise_error"] = False
+        kwargs["print_oe"] = True
+        kwargs["raise_error"] = True
         ret, out, err = run_command(*args, **kwargs)
-        if ret != 0:
-            print(out)
-            print(err)
-            assert ret == 0
+        # if ret != 0:
+        #     print(out)
+        #     print(err)
+        #     assert ret == 0
         # Save log here.
         with self.log_path.open(mode = "a") as fp:
             fp.write(out)
