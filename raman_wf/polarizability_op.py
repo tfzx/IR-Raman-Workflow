@@ -37,9 +37,10 @@ class CalPolar(OP):
         input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
         eps = input_setting["polar_params"]["eps_efield"]
         c_diff = input_setting["polar_params"]["central_diff"]
-        wc_dict: List[np.ndarray] = []
+        wc_dict: Dict[str, np.ndarray] = {}
         for key, p in op_in["wannier_centroid"].items():
-            wc_dict[key] = np.loadtxt(p, dtype = float)
+            arr = np.loadtxt(p, dtype = float, ndmin = 2)
+            wc_dict[key] = arr.reshape(arr.shape[0], -1, 3)
 
         polar = self.cal_polar(c_diff, eps, wc_dict)
         polar_path = Path("polarizability.raw")
@@ -73,13 +74,14 @@ class CalPolar(OP):
         ----------------------------------
         polarizability: np.ndarray. (nframe, natom * 9)
         '''
-        polar = np.zeros((wc_dict[0].shape[0], wc_dict[0].shape[1], 9), dtype = float)
+        v = next(iter(wc_dict.values()))
+        polar = np.zeros((v.shape[0], v.shape[1], 3, 3), dtype = float)
         if c_diff:
-            polar[:, :, 0:3] = (wc_dict["xp"] - wc_dict["xm"]) / (2 * eps)
-            polar[:, :, 3:6] = (wc_dict["yp"] - wc_dict["ym"]) / (2 * eps)
-            polar[:, :, 6:9] = (wc_dict["zp"] - wc_dict["zm"]) / (2 * eps)
+            polar[:, :, 0, :] = (wc_dict["xp"] - wc_dict["xm"]) / (2 * eps)
+            polar[:, :, 1, :] = (wc_dict["yp"] - wc_dict["ym"]) / (2 * eps)
+            polar[:, :, 2, :] = (wc_dict["zp"] - wc_dict["zm"]) / (2 * eps)
         else:
-            polar[:, :, 0:3] = (wc_dict["x"] - wc_dict["ori"]) / eps
-            polar[:, :, 3:6] = (wc_dict["y"] - wc_dict["ori"]) / eps
-            polar[:, :, 6:9] = (wc_dict["z"] - wc_dict["ori"]) / eps
+            polar[:, :, 0, :] = (wc_dict["x"] - wc_dict["ori"]) / eps
+            polar[:, :, 1, :] = (wc_dict["y"] - wc_dict["ori"]) / eps
+            polar[:, :, 2, :] = (wc_dict["z"] - wc_dict["ori"]) / eps
         return polar.reshape(polar.shape[0], -1)
