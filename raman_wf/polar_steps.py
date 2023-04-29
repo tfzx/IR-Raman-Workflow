@@ -12,24 +12,26 @@ from dflow import (
 )
 from dflow.python import (
     PythonOPTemplate,
-    Slices,
     OP
 )
-import mlwf_op, pp_op
+import mlwf_op, pp_op, raman_wf
 from mlwf_op.mlwf_steps import MLWFSteps
+from raman_wf.prepare_polar import PreparePolar
+from raman_wf.polarizability_op import CalPolar
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
 # from mlwf_op.collect_wfc_op import CollectWFC
 # from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
 # from mlwf_op.collect_wannier90 import CollectWann
 
-class DipoleSteps(Steps):
+class PolarSteps(Steps):
     def __init__(
             self,
             name: str,
             mlwf_template: MLWFSteps,
             wc_op: OP,
-            wc_executor: Executor,
+            base_exexutor: Executor,
+            cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]] = None
         ):
         self._input_parameters = {
@@ -43,7 +45,8 @@ class DipoleSteps(Steps):
         self._output_artifacts = {
             "backward": OutputArtifact(),
             "wannier_function_centers": OutputArtifact(),
-            "wannier_centroid": OutputArtifact()
+            "wannier_centroid": OutputArtifact(),
+            "polarizability": OutputArtifact()
         }
         super().__init__(
             name = name,
@@ -56,11 +59,13 @@ class DipoleSteps(Steps):
             )
         )
         if not upload_python_packages:
-            upload_python_packages = mlwf_op.__path__ + pp_op.__path__
+            upload_python_packages = []
+        upload_python_packages += mlwf_op.__path__ + pp_op.__path__ + raman_wf.__path__
         self.build_steps(
             mlwf_template, 
             wc_op,
-            wc_executor, 
+            base_exexutor,
+            cal_executor, 
             upload_python_packages
         )
         
@@ -68,7 +73,8 @@ class DipoleSteps(Steps):
             self, 
             mlwf_template: MLWFSteps,
             wc_op: OP, 
-            wc_executor: Executor,
+            base_exexutor: Executor,
+            cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]]
         ):
         input_setting = self.inputs.parameters["input_setting"]
@@ -76,13 +82,22 @@ class DipoleSteps(Steps):
         confs_artifact = self.inputs.artifacts["confs"]
         pseudo_artifact = self.inputs.artifacts["pseudo"]
         prep_polar = Step(
-            
+            name = "prep-polar",
+            template = PythonOPTemplate(
+                PreparePolar, 
+                python_packages = upload_python_packages
+            ),
+            parameters = {
+                "input_setting": input_setting
+            },
+            executor = base_exexutor
         )
+        self.add(prep_polar)
         mlwf_step = Step(
             name = "cal-MLWF",
             template = mlwf_template,
             parameters = {
-                "input_setting": input_setting,
+                "input_setting": prep_polar.outputs.parameters["input_setting"],
                 "task_setting": task_setting
             },
             artifacts = {
@@ -102,9 +117,25 @@ class DipoleSteps(Steps):
                 "confs": confs_artifact,
                 "wannier_function_centers": mlwf_step.outputs.artifacts["wannier_function_centers"]
             },
-            executor = wc_executor
+            executor = cal_executor
         )
         self.add(wc_step)
+        post_polar = Step(
+            name = "post-polar",
+            template = PythonOPTemplate(
+                CalPolar,
+                python_packages = upload_python_packages
+            ),
+            parameters = {
+                "input_setting": input_setting
+            },
+            artifacts = {
+                "wannier_centroid": wc_step.outputs.artifacts["wannier_centroid"]
+            },
+            executor = cal_executor
+        )
+        self.add(post_polar)
         self.outputs.artifacts["backward"]._from = mlwf_step.outputs.artifacts["backward"]
         self.outputs.artifacts["wannier_function_centers"]._from = mlwf_step.outputs.artifacts["wannier_function_centers"]
         self.outputs.artifacts["wannier_centroid"]._from = wc_step.outputs.artifacts["wannier_centroid"]
+        self.outputs.artifacts["polarizability"]._from = post_polar.outputs.artifacts["polarizability"]
