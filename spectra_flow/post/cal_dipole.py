@@ -35,8 +35,8 @@ def fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, 
     np.apply_along_axis(fix, axis = -1, arr = c)
     return c.reshape(coords_sel.shape[0], -1, 3)[:, num_sel:-1, :]
 
-def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, wannier: np.ndarray) -> np.ndarray:
-    coords_oth = fix_coords(coords_sel, coords_oth, box, r_bond = 1.1)
+def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, wannier: np.ndarray, r_bond = 1.2) -> np.ndarray:
+    coords_oth = fix_coords(coords_sel, coords_oth, box, r_bond)
     total_dipole = np.sum(coords_oth, axis = 1) - np.sum(coords_sel, axis = 1) * 2. - np.sum(wannier, axis = 1) * 8.
     vol = np.prod(box, axis = -1, keepdims = True)
     return total_dipole / np.sqrt(vol) * np.sqrt(0.52917721067)

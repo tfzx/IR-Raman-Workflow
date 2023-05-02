@@ -51,5 +51,5 @@ class CalTotalDipole(OP):
         nframes = coords.shape[0]
         wc = wc.reshape(nframes, -1, 3)
         return calculate_dipole_h2o(
-            coords[:, mask_O], coords[:, ~mask_O], box, wc
+            coords[:, mask_O], coords[:, ~mask_O], box, wc, r_bond = 1.2
         ).reshape(confs.get_nframes(), -1)
