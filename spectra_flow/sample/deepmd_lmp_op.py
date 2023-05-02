@@ -40,7 +40,7 @@ class DpLmpSample(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        conf_path: Path = op_in["conf_path"]
+        conf_path: Path = op_in["input_conf"]
         conf_fmt = op_in["conf_fmt"]
         input_conf = read_conf(conf_path, conf_fmt)
         ir_setting = op_in["ir_setting"]
@@ -91,7 +91,7 @@ class DpLmpSample(OP):
 
     def run_lammps(self, lammps_dir: Path, in_file_path: Path):
         with set_directory(lammps_dir):
-            ret, out, err = run_command(f"export OMP_NUM_THREADS=32 && lmp -in {in_file_path.name}")
+            ret, out, err = run_command(f"export OMP_NUM_THREADS=32 && lmp -in {in_file_path.name}", try_bash = True, print_oe = True)
             log = Path("lmp.log")
             smp_sys = Path("sampled_system.npz")
             log.write_text(out)
