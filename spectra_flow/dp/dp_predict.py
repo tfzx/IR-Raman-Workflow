@@ -24,7 +24,7 @@ class DpPredict(OP, abc.ABC):
         return OPIOSign({
             "dp_setting": BigParameter(dict),
             "sampled_system": Artifact(Path),
-            "conf_fmt": BigParameter(dict),
+            "sys_fmt": BigParameter(dict),
             "frozen_model": Artifact(Path),
         })
 
@@ -40,8 +40,8 @@ class DpPredict(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         sys_path: Path = op_in["sampled_system"]
-        conf_fmt = op_in["conf_fmt"]
-        smp_sys = read_conf(sys_path, conf_fmt)
+        sys_fmt = op_in["sys_fmt"]
+        smp_sys = read_conf(sys_path, sys_fmt)
         predicted_tensor = self.eval(op_in["frozen_model"], op_in["dp_setting"], smp_sys)
         tensor_path = Path("predicted_tensor.npy")
         np.save(tensor_path, predicted_tensor)

@@ -12,7 +12,7 @@ from dflow.utils import (
     set_directory,
     run_command
 )
-from spectra_flow.utils import filter_confs
+from spectra_flow.utils import filter_confs, read_conf
 
 class DPTrain(OP):
     def __init__(self) -> None:
@@ -27,8 +27,9 @@ class DPTrain(OP):
     def get_input_sign(cls):
         return OPIOSign({
             "confs": Artifact(Path),
-            "dp_train_inputs": BigParameter(Dict),
-            "tensor": Artifact(Path),
+            "conf_fmt": BigParameter(dict),
+            "train_inputs": BigParameter(Dict),
+            "label": Artifact(Path),
         })
 
     @classmethod
@@ -42,28 +43,28 @@ class DPTrain(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
-        tensor = np.loadtxt(op_in["tensor"], dtype = float)
-        train_inputs = op_in["dp_train_inputs"]
-        train_dir = self.prepare_train(train_inputs, confs, tensor)
+        confs = read_conf(op_in["confs"], op_in["conf_fmt"])
+        label = np.loadtxt(op_in["label"], dtype = float)
+        train_inputs = op_in["train_inputs"]
+        train_dir = self.prepare_train(train_inputs, confs, label)
         model = self.run_train(train_dir)
         return OPIO({
             "frozen_model": model
         })
     
-    def prepare_train(self, train_inputs: Dict, confs: dpdata.System, tensor: np.ndarray, set_size: int = 5000):
+    def prepare_train(self, train_inputs: Dict, confs: dpdata.System, label: np.ndarray, set_size: int = 5000):
         data_dir = Path("data")
         train_dir = Path("train")
         data_dir.mkdir()
         train_dir.mkdir()
-        confs, tensor = filter_confs(confs, tensor)
+        confs, label = filter_confs(confs, label)
         confs.to("deepmd/npy", data_dir, set_size = set_size)
         nframes = confs.get_nframes()
         start_i = 0
         idx = 0
         while start_i < nframes:
             end_i = min(start_i + set_size, nframes)
-            np.save(data_dir / Path(f"set.{idx:03d}") / Path(f"atomic_{self.full_name[self.dp_type]}.npy"), tensor[start_i:end_i])
+            np.save(data_dir / Path(f"set.{idx:03d}") / Path(f"atomic_{self.full_name[self.dp_type]}.npy"), label[start_i:end_i])
         train_inputs["training"].update({
             "systems": [str(data_dir.absolute())],
             "set_prefix": "set"
