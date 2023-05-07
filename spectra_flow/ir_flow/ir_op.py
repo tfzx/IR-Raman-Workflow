@@ -10,7 +10,7 @@ from dflow.python import (
 )
 from spectra_flow.ir_flow.cal_ir import calculate_corr_vdipole, calculate_ir
 
-class IR(OP):
+class CalIR(OP):
     def __init__(self) -> None:
         super().__init__()
     
