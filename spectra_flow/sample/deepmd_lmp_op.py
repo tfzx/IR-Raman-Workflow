@@ -21,8 +21,7 @@ class DpLmpSample(OP):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "ir_setting": BigParameter(Dict),
-            "sample_setting": BigParameter(Dict),
+            "global": BigParameter(Dict),
             "input_conf": Artifact(Path),
             "conf_fmt": BigParameter(dict),
             "dp_model": Artifact(Path)
@@ -32,6 +31,7 @@ class DpLmpSample(OP):
     def get_output_sign(cls):
         return OPIOSign({
             "sampled_system": Artifact(Path),
+            "sys_fmt": BigParameter(dict),
             "lammps_log": Artifact(Path),
         })
 
@@ -43,21 +43,25 @@ class DpLmpSample(OP):
         conf_path: Path = op_in["input_conf"]
         conf_fmt = op_in["conf_fmt"]
         input_conf = read_conf(conf_path, conf_fmt)
-        ir_setting = op_in["ir_setting"]
-        sample_setting = op_in["sample_setting"]
+        global_config = op_in["global"]
         dp_model = op_in["dp_model"]
-        lammps_dir, in_file_path = self.prepare_lmp(ir_setting, sample_setting, input_conf, dp_model)
-        log, smp_sys = self.run_lammps(lammps_dir, in_file_path)
+        lammps_dir, in_file_path = self.prepare_lmp(global_config, input_conf, dp_model)
+        log, smp_sys, sys_fmt = self.run_lammps(lammps_dir, in_file_path)
+
+        if "type_map" in conf_fmt:
+            sys_fmt["type_map"] = conf_fmt["type_map"]
+        
         return OPIO({
             "sampled_system": lammps_dir / smp_sys,
+            "sys_fmt": sys_fmt,
             "lammps_log": lammps_dir / log
         })
     
-    def prepare_lmp(self, ir_setting: Dict, sample_setting: Dict, input_conf: dpdata.System, dp_model: Path):
-        mass_l = sample_setting["mass"]
-        temperature = ir_setting["temperature"]
-        dt = ir_setting["dt"]
-        nstep = ir_setting["nstep"]
+    def prepare_lmp(self, global_config: Dict, input_conf: dpdata.System, dp_model: Path):
+        mass_l = global_config["mass"]
+        temperature = global_config["temperature"]
+        dt = global_config["dt"]
+        nstep = global_config["nstep"]
         in_file = [
             "units           metal",
             "boundary        p p p",
@@ -97,4 +101,7 @@ class DpLmpSample(OP):
             log.write_text(out)
             sys = dpdata.System("water.dump", fmt = "lammps/dump")
             np.savez_compressed(smp_sys, coords = sys["coords"], cells = sys["cells"], atom_types = sys["atom_types"])
-        return log, smp_sys
+            sys_fmt = {
+                "fmt": "numpy/npz"
+            }
+        return log, smp_sys, sys_fmt

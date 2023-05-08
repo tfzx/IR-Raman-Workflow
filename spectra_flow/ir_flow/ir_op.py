@@ -17,7 +17,7 @@ class CalIR(OP):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "ir_setting": BigParameter(Dict),
+            "global": BigParameter(Dict),
             "total_dipole": Artifact(Path)
         })
 
@@ -32,11 +32,11 @@ class CalIR(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        ir_setting = op_in["ir_setting"]
-        dt = ir_setting["dt"]
-        width = ir_setting["width"]
-        temperature = ir_setting["temperature"]
-        window = ir_setting["window"]
+        global_config = op_in["global"]
+        dt = global_config["dt"]
+        width = global_config["width"]
+        temperature = global_config["temperature"]
+        window = global_config["window"]
 
         total_dipole = np.load(op_in["total_dipole"])
         
