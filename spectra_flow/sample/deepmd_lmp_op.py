@@ -22,7 +22,7 @@ class DpLmpSample(OP):
     def get_input_sign(cls):
         return OPIOSign({
             "global": BigParameter(Dict),
-            "input_conf": Artifact(Path),
+            "init_conf": Artifact(Path),
             "conf_fmt": BigParameter(dict),
             "dp_model": Artifact(Path)
         })
@@ -40,12 +40,12 @@ class DpLmpSample(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        conf_path: Path = op_in["input_conf"]
+        conf_path: Path = op_in["init_conf"]
         conf_fmt = op_in["conf_fmt"]
-        input_conf = read_conf(conf_path, conf_fmt)
+        init_conf = read_conf(conf_path, conf_fmt)
         global_config = op_in["global"]
         dp_model = op_in["dp_model"]
-        lammps_dir, in_file_path = self.prepare_lmp(global_config, input_conf, dp_model)
+        lammps_dir, in_file_path = self.prepare_lmp(global_config, init_conf, dp_model)
         log, smp_sys, sys_fmt = self.run_lammps(lammps_dir, in_file_path)
 
         if "type_map" in conf_fmt:
@@ -57,7 +57,7 @@ class DpLmpSample(OP):
             "lammps_log": lammps_dir / log
         })
     
-    def prepare_lmp(self, global_config: Dict, input_conf: dpdata.System, dp_model: Path):
+    def prepare_lmp(self, global_config: Dict, init_conf: dpdata.System, dp_model: Path):
         mass_l = global_config["mass"]
         temperature = global_config["temperature"]
         dt = global_config["dt"]
@@ -70,7 +70,7 @@ class DpLmpSample(OP):
             "neigh_modify    every 1 delay 0 check yes",
             "read_data	     ./input.lmp"
         ]
-        in_file += [f"mass {i + 1:d} {mass_l[i]:8.5f}" for i in range(len(input_conf["atom_names"]))]
+        in_file += [f"mass {i + 1:d} {mass_l[i]:8.5f}" for i in range(len(init_conf["atom_names"]))]
         in_file += [
             "pair_style      deepmd dp_model.pb",
             "pair_coeff      * *",
@@ -86,7 +86,7 @@ class DpLmpSample(OP):
         lammps_dir = Path("lammps")
         lammps_dir.mkdir()
         with set_directory(lammps_dir):
-            input_conf.to("lammps/lmp", "input.lmp", frame_idx = 0)
+            init_conf.to("lammps/lmp", "input.lmp", frame_idx = 0)
             shutil.copy(dp_model, "dp_model.pb")
 
             in_file_path = Path("in.water")

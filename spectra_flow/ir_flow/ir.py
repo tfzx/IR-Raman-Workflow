@@ -36,6 +36,10 @@ from spectra_flow.ir_flow.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_op import CalIR
 
 
+def build_ir(global_config: dict, machine_config: dict, run_config: dict = None):
+    
+    return
+
 class IRflow(Steps):
     def __init__(self, 
             name: str,
@@ -53,16 +57,16 @@ class IRflow(Steps):
             "dp_setting": InputParameter(type = dict, value = {}),
             "conf_fmt": InputParameter(type = dict, value = {}),
             "sys_fmt": InputParameter(type = dict, value = {}),
-            "input_conf_fmt": InputParameter(type = dict, value = {})
+            "init_conf_fmt": InputParameter(type = dict, value = {})
         }
         self._input_artifacts = {
             "dp_model": InputArtifact(),
-            "confs": InputArtifact(),
-            "pseudo": InputArtifact(),
-            "wannier_centroid": InputArtifact(),
-            "sampled_system": InputArtifact(),
             "dwann_model": InputArtifact(),
-            "input_conf": InputArtifact(),
+            "pseudo": InputArtifact(),
+            "confs": InputArtifact(),
+            "sampled_system": InputArtifact(),
+            "init_conf": InputArtifact(),
+            "wannier_centroid": InputArtifact(),
             "total_dipole": InputArtifact()
         }
         self._output_artifacts = {
@@ -206,12 +210,12 @@ class IRflow(Steps):
                 python_packages = self.upload_python_packages
             ),
             artifacts = {
-                "input_conf": self.inputs.artifacts["input_conf"],
+                "init_conf": self.inputs.artifacts["init_conf"],
                 "dp_model": self.inputs.artifacts["dp_model"]
             },
             parameters = {
                 "global": self.inputs.parameters["global"],
-                "conf_fmt": self.inputs.parameters["input_conf_fmt"]
+                "conf_fmt": self.inputs.parameters["init_conf_fmt"]
             },
             executor = self.executors["deepmd_lammps"]
         )
