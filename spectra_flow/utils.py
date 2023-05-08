@@ -43,16 +43,16 @@ def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dp
         if head == "numpy":
             conf = conf_from_npz(np.load(conf_path), type_map)
         else:
-            conf = dpdata.System(conf_path, fmt = fmt)
+            conf = dpdata.System(conf_path, fmt = fmt, type_map = type_map)
     else:
         try:
-            conf = dpdata.System(conf_path, fmt = "deepmd/raw")
+            conf = dpdata.System(conf_path, fmt = "deepmd/raw", type_map = type_map)
         except NotImplementedError:
             try:
-                conf = dpdata.System(conf_path, fmt = "deepmd/npy")
+                conf = dpdata.System(conf_path, fmt = "deepmd/npy", type_map = type_map)
             except NotImplementedError:
                 try:
-                    conf = dpdata.System(conf_path)
+                    conf = dpdata.System(conf_path, type_map = type_map)
                 except NotImplementedError:
                     conf = conf_from_npz(np.load(conf_path), type_map)
     return conf
