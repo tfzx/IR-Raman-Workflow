@@ -11,6 +11,7 @@ from dflow.python import (
 from dflow.utils import (
     set_directory
 )
+from spectra_flow.utils import read_conf
 
 class CollectWFC(OP, abc.ABC):
     def __init__(self) -> None:
@@ -21,6 +22,7 @@ class CollectWFC(OP, abc.ABC):
         return OPIOSign({
             "input_setting": BigParameter(dict),
             "confs": Artifact(Path),
+            "conf_fmt": BigParameter(dict),
             "backward": Artifact(List[Path]),
         })
 
@@ -36,7 +38,7 @@ class CollectWFC(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         input_setting: dict = op_in["input_setting"]
-        self.confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
+        self.confs = read_conf(op_in["confs"], op_in["conf_fmt"])
         backward: List[Path] = op_in["backward"]
 
         wfc = self.collect_wfc(input_setting, backward)

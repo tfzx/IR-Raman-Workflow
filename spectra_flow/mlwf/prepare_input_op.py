@@ -14,7 +14,7 @@ from dflow.utils import (
     set_directory
 )
 import dpdata
-
+from spectra_flow.utils import read_conf
 
 
 class Prepare(OP, abc.ABC):
@@ -27,6 +27,7 @@ class Prepare(OP, abc.ABC):
             "input_setting": BigParameter(dict),
             "task_setting": BigParameter(dict),
             "confs": Artifact(Path),
+            "conf_fmt": BigParameter(dict),
             "pseudo": Artifact(Path)
         })
 
@@ -45,7 +46,7 @@ class Prepare(OP, abc.ABC):
     ) -> OPIO:
         input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
         group_size: int = op_in["task_setting"]["group_size"]
-        confs = dpdata.System(op_in["confs"], fmt='deepmd/raw', type_map = ['O', 'H'])
+        confs = read_conf(op_in["confs"], op_in["conf_fmt"])
         pseudo: Path = op_in["pseudo"]
 
         input_setting = self.init_inputs(input_setting, confs)

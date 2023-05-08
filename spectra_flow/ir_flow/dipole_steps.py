@@ -35,6 +35,7 @@ class DipoleSteps(Steps):
         self._input_parameters = {
             "input_setting": InputParameter(type = dict, value = {}),
             "task_setting": InputParameter(type = dict, value = {}),
+            "conf_fmt": InputParameter(type = dict, value = {})
         }
         self._input_artifacts = {
             "confs": InputArtifact(),
@@ -73,6 +74,7 @@ class DipoleSteps(Steps):
         ):
         input_setting = self.inputs.parameters["input_setting"]
         task_setting = self.inputs.parameters["task_setting"]
+        conf_fmt = self.inputs.parameters["conf_fmt"]
         confs_artifact = self.inputs.artifacts["confs"]
         pseudo_artifact = self.inputs.artifacts["pseudo"]
         mlwf_step = Step(
@@ -80,7 +82,8 @@ class DipoleSteps(Steps):
             template = mlwf_template,
             parameters = {
                 "input_setting": input_setting,
-                "task_setting": task_setting
+                "task_setting": task_setting,
+                "conf_fmt": conf_fmt
             },
             artifacts = {
                 "confs": confs_artifact,

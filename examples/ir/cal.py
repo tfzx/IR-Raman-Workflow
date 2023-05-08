@@ -99,7 +99,11 @@ cal_dipole_step = Step(
     template = steps,
     parameters = {
         "input_setting": input_setting,
-        "task_setting": task_setting
+        "task_setting": task_setting,
+        "conf_fmt": {
+            "type_map": ["O", "H"],
+            "fmt": "deepmd/raw"
+        }
     },
     artifacts = {
         "confs": upload_artifact("./data"),
