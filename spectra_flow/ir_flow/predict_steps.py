@@ -30,11 +30,11 @@ class PredictSteps(Steps):
         ):
         self._input_parameters = {
             "dp_setting": InputParameter(type = dict, value = {}),
-            "conf_fmt": InputParameter(type = dict, value = {}),
+            "sys_fmt": InputParameter(type = dict, value = {}),
         }
         self._input_artifacts = {
             "sampled_system": InputArtifact(),
-            "frozen_model": InputArtifact(),
+            "dwann_model": InputArtifact(),
         }
         self._output_artifacts = {
             "predicted_wc": OutputArtifact(),
@@ -65,9 +65,9 @@ class PredictSteps(Steps):
             upload_python_packages: List[Union[str, Path]]
         ):
         dp_setting = self.inputs.parameters["dp_setting"]
-        conf_fmt = self.inputs.parameters["conf_fmt"]
+        sys_fmt = self.inputs.parameters["sys_fmt"]
         sampled_system_artifact = self.inputs.artifacts["sampled_system"]
-        frozen_model_artifact = self.inputs.artifacts["frozen_model"]
+        dwann_model_artifact = self.inputs.artifacts["dwann_model"]
         
         predict_dipole = Step(
             "predict-dipole",
@@ -78,11 +78,11 @@ class PredictSteps(Steps):
             ),
             artifacts = {
                 "sampled_system": sampled_system_artifact,
-                "frozen_model": frozen_model_artifact
+                "frozen_model": dwann_model_artifact
             },
             parameters = {
                 "dp_setting": dp_setting,
-                "conf_fmt": conf_fmt
+                "sys_fmt": sys_fmt
             },
             executor = predict_executor
         )
@@ -100,7 +100,7 @@ class PredictSteps(Steps):
                 "wannier_centroid": predict_dipole.outputs.artifacts["predicted_tensor"]
             },
             parameters = {
-                "conf_fmt": conf_fmt,
+                "conf_fmt": sys_fmt,
             },
             executor = cal_executor
         )
