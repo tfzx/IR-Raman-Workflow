@@ -83,7 +83,7 @@ class DPTrain(OP, abc.ABC):
 
     def run_train(self, train_dir: Path):
         with set_directory(train_dir):
-            run_command("export OMP_NUM_THREADS = 32 dp train input.json", try_bash = True, print_oe = True)
+            run_command("export OMP_NUM_THREADS=20 && dp train input.json", try_bash = True, print_oe = True)
             run_command(f"dp freeze -o {self.dp_type}.pb", try_bash = True, print_oe = True)
             model = Path(f"{self.dp_type}.pb").absolute()
         return model
