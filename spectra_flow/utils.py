@@ -3,6 +3,8 @@ import numpy as np
 from copy import deepcopy
 import dpdata
 from pathlib import Path
+from dflow import executor
+from dflow.plugins.dispatcher import DispatcherExecutor
 
 def kmesh(nx: int, ny: int, nz: int):
     kx = (np.arange(nx) / nx).reshape(-1, 1) * np.array([1, 0, 0])
@@ -187,3 +189,7 @@ def diff_8(g):
     g_3 = np.dot(w, b)   # approx g[3]
     g_4 = np.dot(w[::-1], b)
     return g_3, g_4
+
+def get_executor(exec_config: dict) -> executor:
+    if exec_config["type"] == "bohrium":
+        return DispatcherExecutor(machine_dict = exec_config["machine_dict"])
