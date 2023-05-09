@@ -80,7 +80,7 @@ def check_coords(coords: np.ndarray, box: np.ndarray, eps: float):
 
 def filter_confs(confs: dpdata.System, tensor: np.ndarray):
     mask = check_coords(confs["coords"], confs["cells"].diagonal(offset = 0, axis1 = 1, axis2 = 2), eps = 1e-3)
-    confs = confs[mask]
+    confs = confs.sub_system(np.nonzero(mask)[0].tolist())
     tensor = tensor[mask, ...]
     return confs, tensor
 
@@ -192,4 +192,10 @@ def diff_8(g):
 
 def get_executor(exec_config: dict) -> executor:
     if exec_config["type"] == "bohrium":
-        return DispatcherExecutor(machine_dict = exec_config["machine_dict"])
+        return DispatcherExecutor(machine_dict = {
+            "batch_type": "Bohrium",
+            "context_type": "Bohrium",
+            "remote_profile": {
+                "input_data": exec_config["params"],
+            },
+        },)
