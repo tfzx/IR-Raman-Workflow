@@ -41,19 +41,19 @@ from spectra_flow.utils import (
 
 
 def build_ir(global_config: dict, machine_config: dict, run_config: dict = None):
+    executors = {}
+    for name, exec_config in machine_config["executors"].items():
+        executors[name] = get_executor(exec_config)
+    if run_config is None:
+        run_config = {}
     checker = IRchecker(global_config, machine_config)
-    if run_config:
-        checker.set_run_config(run_config)
-    else:
-        assert checker.get_run_config()
-        run_config = checker.run_config
-    input_parameters, input_artifacts_path = checker.get_inputs()
+    assert checker.check_all()
+    run_config = complete_by_default(run_config, checker.get_run_config())
+    ir_inputs = IRinputs(run_config)
+    input_parameters, input_artifacts_path = checker.get_inputs(*ir_inputs.get_inputs_list())
     input_artifacts = {}
     for name, path in input_artifacts_path.items():
         input_artifacts[name] = upload_artifact(path)
-    executors = {}
-    for name, exec_config in machine_config["executors"]:
-        executors[name] = get_executor(exec_config)
     ir_template = IRflow(checker.global_global["name"], run_config, executors)
     ir_step = Step(
         checker.global_global["name"],
@@ -63,37 +63,90 @@ def build_ir(global_config: dict, machine_config: dict, run_config: dict = None)
     )
     return ir_step
 
+
+class IRinputs:
+    step_list = ["dipole", "train", "predict", "cal_ir"]
+    def __init__(self, run_config: dict) -> None:
+        self.run_config = run_config
+        self.run_input_parameters: Dict[str, List[str]] = {
+            "dipole": [
+                "input_setting",
+                "task_setting",
+                "train_conf_fmt"
+            ],
+            "train": ["dp_setting"],
+            "predict": [],
+            "cal_ir": ["global"]
+        }
+        self.run_input_artifacts: Dict[str, List[str]] = {
+            "dipole": ["pseudo"],
+            "train": [],
+            "predict": [],
+            "cal_ir": []
+        }
+        self.start_input_parameters: Dict[str, List[str]] = {
+            "dipole": [],
+            "train": ["train_conf_fmt"],
+            "predict": [],
+            "cal_ir": []
+        }
+        self.start_input_artifacts: Dict[str, List[str]] = {
+            "dipole": ["train_confs"],
+            "train": ["train_confs", "train_label"],
+            "predict": ["dwann_model"],
+            "cal_ir": ["total_dipole"]
+        }
+        if run_config["provide_sample"]:
+            self.run_input_parameters["predict"] += ["sys_fmt"]
+            self.run_input_artifacts["predict"] += ["sampled_system"]
+        else:
+            self.run_input_parameters["predict"] += ["init_conf_fmt", "global"]
+            self.run_input_artifacts["predict"] += ["init_conf", "dp_model"]
+        self.run_range = list(range(
+            self.step_list.index(run_config["start_steps"]),
+            self.step_list.index(run_config["end_steps"]) + 1
+        ))
+
+    def get_inputs_list(self):
+        input_parameters = set()
+        input_artifacts = set()
+        for i in self.run_range:
+            step = self.step_list[i]
+            input_parameters.update(self.run_input_parameters[step])
+            input_artifacts.update(self.run_input_artifacts[step])
+        start_steps = self.run_config["start_steps"]
+        input_parameters.update(self.start_input_parameters[start_steps])
+        input_artifacts.update(self.start_input_artifacts[start_steps])
+        return list(input_parameters), list(input_artifacts)
+
+
 class IRchecker:
     step_list = ["dipole", "train", "predict", "cal_ir"]
+    _default_config = {
+        "config": {
+            "global": {
+                "name": "system",
+                "calculation": "ir",
+                "dt": 0.0003,
+                "nstep": 10000,
+                "window": 1000,
+                "temperature": 300,
+                "width": 240
+            },
+        },
+        "uploads": {
+            "frozen_model": {},
+            "system": {},
+            "other": {}
+        }
+    }
+    
     def __init__(self, global_config: dict, machine_config: dict) -> None:
         self.global_config = global_config
         self.machine_config = machine_config
-        self.run_config = {}
-        self._input_parameters = {}
-        self._input_artifacts = {}
         self._default()
-        self.global_global = self.global_config["config"]["global"]
+        self._init_reader()
         pass
-
-    def _default(self):
-        complete_by_default(self.global_config, {
-            "config": {
-                "global": {
-                    "name": "system",
-                    "calculation": "ir",
-                    "dt": 0.0003,
-                    "nstep": 10000,
-                    "window": 1000,
-                    "temperature": 300,
-                    "width": 240
-                },
-            },
-            "uploads": {
-                "frozen_model": {},
-                "system": {},
-                "other": {}
-            }
-        })
 
     @property
     def config(self) -> dict:
@@ -103,56 +156,108 @@ class IRchecker:
     def uploads(self) -> dict:
         return self.global_config["uploads"]
     
-    def get_inputs(self):
-        load_list = [
-            self.load_dipole,
-            self.load_train,
-            self.load_predict,
-            self.load_ir
-        ]
-        for i in self.run_range:
-            load_list[i]()
-        return self._input_parameters, self._input_artifacts
-
-    def get_run_config(self):
-        if "type_map" not in self.global_global or \
-            "mass_map" not in self.global_global:
+    def check_all(self):
+        if "type_map" not in self.global_global:
+            print("[Error] Missing 'type_map' in global_config")
+            return False
+        if "mass_map" not in self.global_global:
+            print("[Error] Missing 'mass_map' in global_config")
             return False
         self.run_config = {
             "provide_sample": self.check_provide_sample()
         }
-        if_run, if_start = tuple(zip(
+        self.if_run_l, self.if_start_l = tuple(zip(
             self.check_dipole(), 
             self.check_train(), 
             self.check_predict(), 
             self.check_ir(), 
         ))
-        for i in range(4).__reversed__():
-            if if_start[i]:
+        if True not in self.if_start_l:
+            print("[Error] Missing some inputs!")
+            return False
+        return True
+
+    def get_run_config(self):
+        if not hasattr(self, "if_run_l") or not hasattr(self, "if_start_l"):
+            if not self.check_all():
+                return
+        for i in reversed(range(4)):
+            if self.if_start_l[i]:
                 id_start = i
                 break
         else:
-            return False
+            raise RuntimeError("Check fail!")
         for i in range(id_start, 4):
-            if if_run[i]:
+            if self.if_run_l[i]:
                 id_end = i
             else:
                 break
-        self.run_range = list(range(id_start, id_end + 1))
-        self.run_config["start_steps"] = self.step_list[id_start]
-        self.run_config["end_steps"] = self.step_list[id_end]
-        if self.run_config["start_steps"] == "dipole":
-            self.run_config["dipole_config"] = {
+        run_config = {
+            "start_steps": self.step_list[id_start],
+            "end_steps": self.step_list[id_end],
+            "provide_sample": self.check_provide_sample()
+        }
+        if run_config["start_steps"] == "dipole":
+            run_config["dipole_config"] = {
                 "dft_type": self.config["dipole"]["dft_type"]
             }
-        return True
+        return run_config
 
-    def set_run_config(self, run_config: dict):
-        self.run_config = run_config
-        self.run_range = list(range(
-            self.step_list.index(self.run_config["start_steps"]),
-            self.step_list.index(self.run_config["end_steps"]) + 1
-        ))
+    def get_inputs(self, input_parameters_l: List[str], input_artifacts_l: List[str]):
+        self._input_parameters = {}
+        self._input_artifacts = {}
+        for key in input_parameters_l:
+            self._read_parameters(key)
+        for key in input_artifacts_l:
+            self._read_artifacts(key)
+        return self._input_parameters, self._input_artifacts
+
+    def _default(self):
+        complete_by_default(self.global_config, self._default_config)
+        self.global_global = self.global_config["config"]["global"]
+        if "dipole" in self.config:
+            complete_by_default(self.config["dipole"]["input_setting"], {"name": self.global_global["name"]})
+
+    def _init_reader(self):
+        self._inputs_p_reader = {
+            "global": lambda: self.config["global"],
+            "input_setting": lambda: self.config["dipole"]["input_setting"],
+            "task_setting": lambda: self.config["dipole"]["task_setting"],
+            "dp_setting": lambda: self.config["deep_model"],
+            "train_conf_fmt": lambda: None,
+            "init_conf_fmt": lambda: None,
+            "sys_fmt": lambda: None,
+        }
+        self._inputs_a_reader = {
+            "dp_model": lambda: self.uploads["frozen_model"]["deep_potential"],
+            "dwann_model": lambda: self.uploads["frozen_model"]["deep_wannier"],
+            "train_confs": lambda: self.load_system("train_confs"),
+            "sampled_system": lambda: self.load_system("sampled_system"),
+            "init_conf": lambda: self.load_system("init_conf"),
+            "pseudo": lambda: self.uploads["other"]["pseudo"],
+            "train_label": lambda: self.uploads["other"]["train_label"],
+            "total_dipole": lambda: self.uploads["other"]["total_dipole"],
+        }
+        self._sys_fmt_map = {
+            "train_confs": "train_conf_fmt",
+            "sampled_system": "sys_fmt",
+            "init_conf": "init_conf_fmt",
+        }
+
+    def _read_parameters(self, key: str):
+        fun = self._inputs_p_reader[key]
+        out = fun()
+        if out is not None:
+            self._input_parameters[key] = out
+
+    def _read_artifacts(self, key: str):
+        fun = self._inputs_a_reader[key]
+        out = fun()
+        if isinstance(out, tuple):
+            self._input_artifacts[key] = out[0]
+            self._input_parameters[self._sys_fmt_map[key]] = out[1]
+        else:
+            self._input_artifacts[key] = out
 
     def check_provide_sample(self):
         return "sampled_system" in self.uploads["system"]
@@ -175,7 +280,7 @@ class IRchecker:
         return if_run, if_start
     
     def check_predict(self):
-        if_run = self.run_config["provide_sample"] or self.check_sample()
+        if_run = self.check_provide_sample() or self.check_sample()
         if_start = if_run and "deep_wannier" in self.uploads["frozen_model"]
         if_start = if_start and "deep_model" in self.config
         return if_run, if_start
@@ -184,62 +289,6 @@ class IRchecker:
         if_run = True
         if_start = if_run and "total_dipole" in self.uploads["other"]
         return if_run, if_start
-
-    def load_dipole(self):
-        dipole_config = self.config["dipole"]
-        input_setting = dipole_config["input_setting"]
-        complete_by_default(input_setting, {"name": self.global_global["name"]})
-        task_setting = dipole_config["task_setting"]
-        self._input_parameters.update({
-            "input_setting": input_setting,
-            "task_setting": task_setting
-        })
-        if self.run_config["start_steps"] == "dipole":
-            train_confs, train_conf_fmt = self.load_system("train_confs")
-            self._input_artifacts["train_confs"] = train_confs
-            self._input_parameters["train_conf_fmt"] = train_conf_fmt
-        if dipole_config["dft_type"] in ["qe", "qe_cp"]:
-            self._input_artifacts["pseudo"] = self.uploads["other"]["pseudo"]
-
-    def load_train(self):
-        self._input_parameters["dp_setting"] = self.config["deep_model"]
-        if self.run_config["start_steps"] == "train":
-            train_confs, train_conf_fmt = self.load_system("train_confs")
-            train_label = self.uploads["other"]["train_label"]
-            self._input_parameters.update({
-                "train_conf_fmt": train_conf_fmt
-            })
-            self._input_artifacts.update({
-                "train_confs": train_confs,
-                "train_label": train_label
-            })
-    
-    def load_sample(self):
-        init_conf, init_conf_fmt = self.load_system("init_conf")
-        self._input_parameters.update({
-            "global": self.global_global,
-            "init_conf_fmt": init_conf_fmt
-        })
-        self._input_artifacts.update({
-            "init_conf": init_conf,
-            "dp_model": self.uploads["frozen_model"]["deep_potential"]
-        })
-
-    def load_predict(self):
-        if self.run_config["provide_sample"]:
-            sampled_system, sys_fmt = self.load_system("sampled_system")
-            self._input_parameters["sys_fmt"] = sys_fmt
-            self._input_artifacts["sampled_system"] = sampled_system
-        else:
-            self.load_sample()
-        if self.run_config["start_steps"] == "predict":
-            self._input_parameters["dp_setting"] = self.config["deep_model"]
-            self._input_artifacts["dwann_model"] = self.uploads["frozen_model"]["deep_wannier"]
-    
-    def load_ir(self):
-        self._input_parameters["global"] = self.global_global
-        if self.run_config["start_steps"] == "cal_ir":
-            self._input_artifacts["total_dipole"] = self.uploads["other"]["total_dipole"]
 
     def load_system(self, name: str):
         sys = self.uploads["system"][name]
@@ -250,9 +299,66 @@ class IRchecker:
         if "fmt" in sys:
             sys_fmt["fmt"] = sys["fmt"]
         return sys_path, sys_fmt
+    
+    # def load_dipole(self):
+    #     dipole_config = self.config["dipole"]
+    #     input_setting = dipole_config["input_setting"]
+    #     complete_by_default(input_setting, {"name": self.global_global["name"]})
+    #     task_setting = dipole_config["task_setting"]
+    #     self._input_parameters.update({
+    #         "input_setting": input_setting,
+    #         "task_setting": task_setting
+    #     })
+    #     if self.run_config["start_steps"] == "dipole":
+    #         train_confs, train_conf_fmt = self.load_system("train_confs")
+    #         self._input_artifacts["train_confs"] = train_confs
+    #         self._input_parameters["train_conf_fmt"] = train_conf_fmt
+    #     if dipole_config["dft_type"] in ["qe", "qe_cp"]:
+    #         self._input_artifacts["pseudo"] = self.uploads["other"]["pseudo"]
+
+    # def load_train(self):
+    #     self._input_parameters["dp_setting"] = self.config["deep_model"]
+    #     if self.run_config["start_steps"] == "train":
+    #         train_confs, train_conf_fmt = self.load_system("train_confs")
+    #         train_label = self.uploads["other"]["train_label"]
+    #         self._input_parameters.update({
+    #             "train_conf_fmt": train_conf_fmt
+    #         })
+    #         self._input_artifacts.update({
+    #             "train_confs": train_confs,
+    #             "train_label": train_label
+    #         })
+    
+    # def load_sample(self):
+    #     init_conf, init_conf_fmt = self.load_system("init_conf")
+    #     self._input_parameters.update({
+    #         "global": self.global_global,
+    #         "init_conf_fmt": init_conf_fmt
+    #     })
+    #     self._input_artifacts.update({
+    #         "init_conf": init_conf,
+    #         "dp_model": self.uploads["frozen_model"]["deep_potential"]
+    #     })
+
+    # def load_predict(self):
+    #     if self.run_config["provide_sample"]:
+    #         sampled_system, sys_fmt = self.load_system("sampled_system")
+    #         self._input_parameters["sys_fmt"] = sys_fmt
+    #         self._input_artifacts["sampled_system"] = sampled_system
+    #     else:
+    #         self.load_sample()
+    #     if self.run_config["start_steps"] == "predict":
+    #         self._input_parameters["dp_setting"] = self.config["deep_model"]
+    #         self._input_artifacts["dwann_model"] = self.uploads["frozen_model"]["deep_wannier"]
+    
+    # def load_ir(self):
+    #     self._input_parameters["global"] = self.global_global
+    #     if self.run_config["start_steps"] == "cal_ir":
+    #         self._input_artifacts["total_dipole"] = self.uploads["other"]["total_dipole"]
 
 
 class IRflow(Steps):
+    step_list = ["dipole", "train", "predict", "cal_ir"]
     def __init__(self, 
             name: str,
             run_config: dict,
@@ -261,31 +367,44 @@ class IRflow(Steps):
         ):
         self.run_config = run_config
         self.executors = executors
-
-        self._input_parameters = {
+        ir_inputs = IRinputs(run_config)
+        input_parameters_l, input_artifacts_l = ir_inputs.get_inputs_list()
+        print("IRflow: inputs_list: ")
+        print("parameters:", input_parameters_l)
+        print("artifacts:", input_artifacts_l)
+        _input_parameters_temp = {
             "global": InputParameter(type = dict, value = {}),
             "input_setting": InputParameter(type = dict, value = {}),
             "task_setting": InputParameter(type = dict, value = {}),
             "dp_setting": InputParameter(type = dict, value = {}),
             "train_conf_fmt": InputParameter(type = dict, value = {}),
+            "init_conf_fmt": InputParameter(type = dict, value = {}),
             "sys_fmt": InputParameter(type = dict, value = {}),
-            "init_conf_fmt": InputParameter(type = dict, value = {})
         }
-        self._input_artifacts = {
+        _input_artifacts_temp = {
             "dp_model": InputArtifact(),
             "dwann_model": InputArtifact(),
-            "pseudo": InputArtifact(),
+            "pseudo": InputArtifact(optional = True),
             "train_confs": InputArtifact(),
             "sampled_system": InputArtifact(),
             "init_conf": InputArtifact(),
             "train_label": InputArtifact(),
             "total_dipole": InputArtifact()
         }
+        _output_artifacts_temp = {
+            "dipole": ["wannier_centroid"],
+            "train": ["dwann_model"],
+            "predict": ["total_dipole"],
+            "cal_ir": ["ir"]
+        }
+        self._input_parameters = {
+            key: _input_parameters_temp[key] for key in input_parameters_l
+        }
+        self._input_artifacts = {
+            key: _input_artifacts_temp[key] for key in input_artifacts_l
+        }
         self._output_artifacts = {
-            "wannier_centroid": OutputArtifact(),
-            "dwann_model": OutputArtifact(),
-            "total_dipole": OutputArtifact(),
-            "ir": OutputArtifact()
+            key: OutputArtifact() for key in _output_artifacts_temp[run_config["end_steps"]]
         }
 
         super().__init__(
@@ -378,13 +497,13 @@ class IRflow(Steps):
         if self.run_config["start_steps"] == "train":
             train_confs = self.inputs.artifacts["train_confs"]
             train_conf_fmt = self.inputs.parameters["train_conf_fmt"]
-            label = self.inputs.artifacts["train_label"]
+            train_label = self.inputs.artifacts["train_label"]
         else:
             out, step = self.build_dipole_steps()
             self.add(step)
             train_confs = out["train_confs"]
             train_conf_fmt = out["train_conf_fmt"]
-            label = out["train_label"]
+            train_label = out["train_label"]
         
         self.train_dwann = Step(
             "train-dwann",
@@ -395,7 +514,7 @@ class IRflow(Steps):
             ),
             artifacts = {
                 "confs": train_confs,
-                "label": label
+                "label": train_label
             },
             parameters = {
                 "conf_fmt": train_conf_fmt,
