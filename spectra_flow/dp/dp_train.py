@@ -71,6 +71,8 @@ class DPTrain(OP, abc.ABC):
         while start_i < nframes:
             end_i = min(start_i + set_size, nframes)
             np.save(data_dir / Path(f"set.{idx:03d}") / Path(f"atomic_{self.full_name[self.dp_type]}.npy"), label[start_i:end_i])
+            start_i += set_size
+            idx += 1
         train_inputs["training"].update({
             "systems": [str(data_dir.absolute())],
             "set_prefix": "set"
@@ -81,8 +83,8 @@ class DPTrain(OP, abc.ABC):
 
     def run_train(self, train_dir: Path):
         with set_directory(train_dir):
-            run_command("dp train input.json")
-            run_command(f"dp freeze -o {self.dp_type}.pb")
+            run_command("export OMP_NUM_THREADS = 32 dp train input.json", try_bash = True, print_oe = True)
+            run_command(f"dp freeze -o {self.dp_type}.pb", try_bash = True, print_oe = True)
             model = Path(f"{self.dp_type}.pb").absolute()
         return model
 
