@@ -58,7 +58,7 @@ class DpLmpSample(OP):
         })
     
     def prepare_lmp(self, global_config: Dict, init_conf: dpdata.System, dp_model: Path):
-        mass_l = global_config["mass"]
+        mass_map = global_config["mass_map"]
         temperature = global_config["temperature"]
         dt = global_config["dt"]
         nstep = global_config["nstep"]
@@ -70,7 +70,7 @@ class DpLmpSample(OP):
             "neigh_modify    every 1 delay 0 check yes",
             "read_data	     ./input.lmp"
         ]
-        in_file += [f"mass {i + 1:d} {mass_l[i]:8.5f}" for i in range(len(init_conf["atom_names"]))]
+        in_file += [f"mass {i + 1:d} {mass_map[i]:8.5f}" for i in range(len(init_conf["atom_names"]))]
         in_file += [
             "pair_style      deepmd dp_model.pb",
             "pair_coeff      * *",
