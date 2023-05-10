@@ -21,7 +21,6 @@ def calculate_corr_polar(polar: np.ndarray, window: int):
     polar_aniso = polar_aniso.reshape(-1, 9)
     corr_aniso = calculate_corr(polar_aniso, polar_aniso, window)
     corr_aniso *= 2 / 15
-    corr_aniso -= np.mean(corr_aniso, axis = 0)
     return corr_iso, corr_aniso
 
 def calculate_raman(corr: np.ndarray, width: int, dt_ps: float, temperature: float):

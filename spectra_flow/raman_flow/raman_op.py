@@ -46,7 +46,7 @@ class CalIR(OP):
         raman_aniso = calculate_raman(corr_aniso, width = width, dt_ps = dt, temperature = temperature)
 
         raman_iso_path = Path("raman_iso.raw")
-        raman_aniso_path = Path("raman_iso.raw")
+        raman_aniso_path = Path("raman_aniso.raw")
         np.savetxt(raman_iso_path, raman_iso, fmt = "%15.8f")
         np.savetxt(raman_aniso_path, raman_aniso, fmt = "%15.8f")
         return OPIO({

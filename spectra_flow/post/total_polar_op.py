@@ -37,5 +37,5 @@ class CalTotalPolar(OP):
         })
     
     def cal_total_polar(self, polar: np.ndarray) -> np.ndarray:
-        polar = polar.reshape(polar.shape[0], -1, 9)
+        polar = polar.reshape(polar.shape[0], -1, 3, 3)
         return np.sum(polar, axis = 1)
