@@ -46,7 +46,7 @@ class DpLmpSample(OP):
         global_config: dict = op_in["global"]
         dp_model = op_in["dp_model"]
         lammps_dir, in_file_path = self.prepare_lmp(global_config, init_conf, dp_model)
-        log, smp_sys, sys_fmt = self.run_lammps(lammps_dir, in_file_path, global_config.get("read_buffer", 20000))
+        log, smp_sys, sys_fmt = self.run_lammps(lammps_dir, in_file_path, global_config.get("read_buffer", 50000))
 
         if "type_map" in conf_fmt:
             sys_fmt["type_map"] = conf_fmt["type_map"]
@@ -93,7 +93,7 @@ class DpLmpSample(OP):
             in_file_path.write_text("\n".join(in_file))
         return lammps_dir, in_file_path
 
-    def run_lammps(self, lammps_dir: Path, in_file_path: Path, read_buffer: int = 20000):
+    def run_lammps(self, lammps_dir: Path, in_file_path: Path, read_buffer: int = 50000):
         with set_directory(lammps_dir):
             ret, out, err = run_command(f"export OMP_NUM_THREADS=32 && lmp -in {in_file_path.name}", try_bash = True, print_oe = True)
             log = Path("lmp.log")

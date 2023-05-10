@@ -202,7 +202,7 @@ def get_executor(exec_config: dict) -> executor:
         },)
 
 
-def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int = 20000):
+def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int = 50000):
     print("#### Read the lammps dump file ####")
     nAtoms = int(np.loadtxt(f_dump, dtype = int, skiprows = 3, max_rows = 1))
     print("Number of atoms =", nAtoms)
@@ -237,7 +237,7 @@ def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int =
         np.savetxt(f_coords, coords_buffer[:idx_buffer])
     return step
 
-def read_lmp_dump(dump_file: Path, BUFFER: int = 20000) -> Dict[str, np.ndarray]:
+def read_lmp_dump(dump_file: Path, BUFFER: int = 50000) -> Dict[str, np.ndarray]:
     try:
         f_cells = TemporaryFile('r+')
         f_coords = TemporaryFile('r+')
@@ -246,11 +246,12 @@ def read_lmp_dump(dump_file: Path, BUFFER: int = 20000) -> Dict[str, np.ndarray]
             _read_dump(f, f_cells, f_coords, f_types, BUFFER)
         sys = {}
         f_coords.seek(0, 0)
-        sys["coords"] = np.loadtxt(f_coords)
+        sys["coords"] = np.loadtxt(f_coords, ndmin = 2)
+        sys["coords"] = sys["coords"].reshape(sys["coords"].shape[0], -1, 3)
         f_cells.seek(0, 0)
-        sys["cells"] = np.loadtxt(f_cells)
+        sys["cells"] = np.loadtxt(f_cells, ndmin = 2).reshape(-1, 3, 3)
         f_types.seek(0, 0)
-        sys["atom_types"] = np.load(f_types)
+        sys["atom_types"] = np.load(f_types).reshape(-1)
     finally:
         f_cells.close()
         f_coords.close()
