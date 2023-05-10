@@ -1,4 +1,5 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Tuple, Union, IO
+from tempfile import TemporaryFile
 import numpy as np
 from copy import deepcopy
 import dpdata
@@ -199,3 +200,59 @@ def get_executor(exec_config: dict) -> executor:
                 "input_data": exec_config["params"],
             },
         },)
+
+
+def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int = 20000):
+    print("#### Read the lammps dump file ####")
+    nAtoms = int(np.loadtxt(f_dump, dtype = int, skiprows = 3, max_rows = 1))
+    print("Number of atoms =", nAtoms)
+    types = np.loadtxt(f_dump, dtype = int, skiprows = 5, max_rows = nAtoms, usecols = [1]) - 1
+    np.save(f_types, types)
+
+    f_dump.seek(0, 0)
+    step = 0
+    idx_buffer = 0
+    box_buffer = np.zeros((BUFFER, 9), dtype = float)
+    coords_buffer = np.zeros((BUFFER, nAtoms * 3), dtype = float)
+    while f_dump.readline() != "":
+        box = np.loadtxt(f_dump, dtype = float, skiprows = 4, max_rows = 3, usecols = [1])
+        if box.size == 0:
+            break
+        box_buffer[idx_buffer] = np.diag(box.reshape(-1)).reshape(-1)
+        coords = np.loadtxt(f_dump, dtype = float, skiprows = 1, max_rows = nAtoms, usecols = [2, 3, 4])
+        if coords.size == 0:
+            print("[Warning]: cannot get the coordinates info!")
+            break
+        coords_buffer[idx_buffer] = coords.reshape(-1)
+        idx_buffer += 1
+        if idx_buffer >= BUFFER:
+            np.savetxt(f_cells, box_buffer)
+            np.savetxt(f_coords, coords_buffer)
+            idx_buffer = 0
+        if step % 10000 == 0:
+            print("current step:", step)
+        step += 1
+    if idx_buffer > 0:
+        np.savetxt(f_cells, box_buffer[:idx_buffer])
+        np.savetxt(f_coords, coords_buffer[:idx_buffer])
+    return step
+
+def read_lmp_dump(dump_file: Path, BUFFER: int = 20000) -> Dict[str, np.ndarray]:
+    try:
+        f_cells = TemporaryFile('r+')
+        f_coords = TemporaryFile('r+')
+        f_types = TemporaryFile()
+        with open(dump_file, 'r') as f:
+            _read_dump(f, f_cells, f_coords, f_types, BUFFER)
+        sys = {}
+        f_coords.seek(0, 0)
+        sys["coords"] = np.loadtxt(f_coords)
+        f_cells.seek(0, 0)
+        sys["cells"] = np.loadtxt(f_cells)
+        f_types.seek(0, 0)
+        sys["atom_types"] = np.load(f_types)
+    finally:
+        f_cells.close()
+        f_coords.close()
+        f_types.close()
+    return sys
