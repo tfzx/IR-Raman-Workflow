@@ -50,11 +50,12 @@ def build_ir(global_config: dict, machine_config: dict, run_config: dict = None)
     assert checker.check_all()
     run_config = complete_by_default(run_config, checker.get_run_config())
     ir_inputs = IRinputs(run_config)
+    ir_template = IRflow(checker.global_global["name"], run_config, executors)
+
     input_parameters, input_artifacts_path = checker.get_inputs(*ir_inputs.get_inputs_list())
     input_artifacts = {}
     for name, path in input_artifacts_path.items():
         input_artifacts[name] = upload_artifact(path)
-    ir_template = IRflow(checker.global_global["name"], run_config, executors)
     ir_step = Step(
         checker.global_global["name"],
         ir_template,
@@ -87,7 +88,7 @@ class IRinputs:
         self.start_input_parameters: Dict[str, List[str]] = {
             "dipole": [],
             "train": ["train_conf_fmt"],
-            "predict": [],
+            "predict": ["dp_setting"],
             "cal_ir": []
         }
         self.start_input_artifacts: Dict[str, List[str]] = {
