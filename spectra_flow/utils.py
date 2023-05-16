@@ -2,9 +2,9 @@ from typing import Dict, List, Tuple, Union, IO
 from tempfile import TemporaryFile
 import numpy as np
 from copy import deepcopy
-import dpdata
+import dpdata, json
 from pathlib import Path
-from dflow import executor
+from dflow.executor import Executor
 from dflow.plugins.dispatcher import DispatcherExecutor
 
 def kmesh(nx: int, ny: int, nz: int):
@@ -27,6 +27,27 @@ def complete_by_default(params: dict, params_default: dict, if_copy: bool = Fals
             if key not in params:
                 params[key] = params_default[key]
     return params
+
+def load_json(path: Union[str, Path]):
+    with open(path, "r") as f:
+        setting = json.load(f)
+    return setting
+
+def bohrium_login(account_config: dict = None):
+    from dflow import config, s3_config
+    from dflow.plugins import bohrium
+    from dflow.plugins.bohrium import TiefblueClient
+    from getpass import getpass
+    config["host"] = "https://workflows.deepmodeling.com"
+    config["k8s_api_server"] = "https://workflows.deepmodeling.com"
+    if account_config:
+        bohrium.config.update(account_config)
+    else:
+        bohrium.config["username"] = input("Bohrium username: ")
+        bohrium.config["password"] = getpass("Bohrium password: ")
+        bohrium.config["project_id"] = input("Project ID: ")
+    s3_config["repo_key"] = "oss-bohrium"
+    s3_config["storage_client"] = TiefblueClient()
 
 def conf_from_npz(raw_conf, type_map: List[str] = None):
     conf_data = dict(raw_conf)
@@ -191,7 +212,7 @@ def diff_8(g):
     g_4 = np.dot(w[::-1], b)
     return g_3, g_4
 
-def get_executor(exec_config: dict) -> executor:
+def get_executor(exec_config: dict) -> Executor:
     if exec_config["type"] == "bohrium":
         return DispatcherExecutor(machine_dict = {
             "batch_type": "Bohrium",
