@@ -1,0 +1,163 @@
+{
+    "config": {
+        "global": {
+            "name": "water",
+            "calculation": "ir",
+            "type_map": ["O", "H"],
+            "mass_map": [15.9994, 2.0141],
+            "read_buffer": 50000,
+            "dt": 0.0003,
+            "nstep": 1000000,
+            "window": 100000,
+            "temperature": 300,
+            "width": 240
+        },
+        
+        "dipole": {
+            "dft_type": "qe",
+            "input_setting": {
+                "name": "water",
+                "dft_params": {
+                    "cal_type": "scf",
+                    "qe_params": {
+                        "control": {
+                            "title": "water",
+                            "nstep": 20000
+                        },
+                        "system": {
+                            "ecutwfc": 110,
+                            "input_dft": "SCAN",
+                            "ibrav": 0
+                        },
+                        "electrons": {
+                            "conv_thr": 1e-08,
+                            "mixing_beta": 0.20
+                        },
+                        "ions": null,
+                        "cell": null
+                    },
+                    "pw2wan_params": {
+                        "inputpp": {
+                            "spin_component": null,
+                            "write_mmn": true,
+                            "write_amn": true,
+                            "write_unk": false
+                        }
+                    },
+                    "pseudo_dir": "pseudo",
+                    "atomic_species": {
+                        "O": {
+                            "mass": 16.0,
+                            "pseudo": "O.SCAN.UPF"
+                        },
+                        "H": {
+                            "mass": 1.0,
+                            "pseudo": "H.SCAN.UPF"
+                        }
+                    },
+                    "k_grid": [
+                        1,
+                        1,
+                        1
+                    ]
+                },
+                "wannier90_params": {
+                    "wan_params": {
+                        "num_iter": 1000,
+                        "kmesh_tol": 0.00000001,
+                        "num_wann": 256,
+                        "write_xyz": true,
+                        "translate_home_cell": true,
+                        "guiding_centres": true,
+                        "mp_grid": "1, 1, 1"
+                    },
+                    "projections": {
+                        "O": "sp3"
+                    }
+                }
+            }
+        },
+
+        "deep_model": {
+            "train_inputs": {
+                "model":{
+                    "type_map":		["O", "H"],
+                    "descriptor" :{
+                        "type":		"se_a",
+                        "sel":		[46, 92],
+                        "rcut_smth":	5.80,
+                        "rcut":		6.00,
+                        "neuron":		[25, 50, 100],
+                        "resnet_dt":	false,
+                        "axis_neuron":	6,
+                        "seed":		1,
+                        "_comment":		" that's all"
+                    },
+                    "fitting_net": {
+                        "type":		"dipole",
+                        "sel_type":		[0],
+                        "neuron":		[100, 100, 100],
+                        "resnet_dt":	true,
+                        "seed":		1
+                    }
+                },
+                    
+                "learning_rate" :{
+                    "type":		"exp",
+                    "start_lr":	0.01,
+                    "decay_steps":	5000,
+                    "decay_rate":	0.95,
+                    "_comment":	"that's all"
+                },
+    
+                "training": {
+                    "systems":	["../0data/"], 
+                    "set_prefix":	"set",    
+                    "stop_batch":	50000,
+                    "batch_size":	4,
+    
+                    "seed":		1,
+    
+                    "disp_file":	"lcurve.out",
+                    "disp_freq":	1000,
+                    "numb_test":	20,
+                    "save_freq":	1000,
+                    "save_ckpt":	"model.ckpt",
+                    "disp_training":true,
+                    "time_training":true,
+                    "_comment":	"that's all"
+                },
+    
+                "loss": {
+                    "type": "tensor",
+                    "pref": 0.0,
+                    "pref_atomic": 1.0
+                }
+            },
+            "amplif": 40.0
+        }
+    },
+    
+    "uploads": {
+        "frozen_model": {
+            "deep_potential": "uploads/frozen_model/potential.pb",
+            "deep_wannier": "uploads/frozen_model/dipole.pb"
+        },
+    
+        "system": {
+            "train_confs": {
+                "path": "uploads/system/train_confs",
+                "fmt": "deepmd/npy"
+            },
+            "init_conf": {
+                "path": "uploads/system/input64.lmp",
+                "fmt": "lammps/lmp"
+            }
+        },
+
+        "other": {
+            "train_label": "uploads/other/dipole.raw",
+            "total_dipole": "uploads/other/total_dipole.npy"
+        }
+    }
+}

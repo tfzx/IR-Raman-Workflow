@@ -1,0 +1,22 @@
+{
+    "config": {
+        "global": {
+            "name": "water",
+            "calculation": "ir",
+            "type_map": ["O", "H"],
+            "mass_map": [15.9994, 2.0141],
+            "read_buffer": 50000,
+            "dt": 0.0003,
+            "nstep": 1000000,
+            "window": 100000,
+            "temperature": 300,
+            "width": 240
+        }
+    },
+    
+    "uploads": {
+        "other": {
+            "total_dipole": "../uploads/other/total_dipole.npy"
+        }
+    }
+}

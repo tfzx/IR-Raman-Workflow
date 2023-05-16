@@ -39,7 +39,7 @@
                     "nit"               : 60,
                     "calwf"             : 3,
                     "tolw"              : 1e-6,
-                    "nsteps"            : 200,
+                    "nsteps"            : 20,
                     "adapt"             : false,
                     "wfdt"              : 2.0,
                     "wf_q"              : 500.0,
