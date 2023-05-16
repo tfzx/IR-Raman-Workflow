@@ -1,9 +1,0 @@
-{
-    "type": "bohrium",
-    "params": {
-        "image_name": "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
-        "machine_type": "c64_m256_cpu",
-        "job_type": "container",
-        "platform": "ali"
-    }
-}

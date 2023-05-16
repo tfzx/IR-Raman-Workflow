@@ -1,0 +1,74 @@
+{
+    "dft_type": "qe_cp",
+    "input_setting": {
+        "name": "water",
+        "num_wann": 256,
+        "dft_params": {
+            "qe_params": {
+                "control": {
+                    "title"         : "water",
+                    "calculation"   : "cp-wf",
+                    "restart_mode"  : "from_scratch",
+                    "prefix"        : "h2o",
+                    "outdir"        : "out",
+                    "nstep"         : 200,
+                    "iprint"        : 100,
+                    "isave"         : 50,
+                    "dt"            : 4.0,
+                    "etot_conv_thr" : 1e-6,
+                    "ekin_conv_thr" : 1e-6
+                },
+                "system": {
+                    "ecutwfc": 110,
+                    "nosym": true,
+                    "input_dft": "PBE",
+                    "ibrav": 0
+                },
+                "electrons": {
+                    "emass"             : 400.0,
+                    "emass_cutoff"      : 3.00,
+                    "ortho_eps"         : 1e-8,
+                    "ortho_max"         : 300,
+                    "electron_dynamics" : "damp",
+                    "electron_damping"  : 0.10
+                },
+                "ions": {
+                    "ion_dynamics" : null
+                },
+                "WANNIER": {
+                    "nit"               : 60,
+                    "calwf"             : 3,
+                    "tolw"              : 1e-6,
+                    "nsteps"            : 200,
+                    "adapt"             : false,
+                    "wfdt"              : 2.0,
+                    "wf_q"              : 500.0,
+                    "wf_friction"       : 0.4
+                }
+            },
+            "pseudo_dir": "pseudo",
+            "atomic_species": {
+                "O": {
+                    "mass": 16.0,
+                    "pseudo": "O_ONCV_PBE-1.2.upf"
+                },
+                "H": {
+                    "mass": 1.0,
+                    "pseudo": "H_ONCV_PBE-1.2.upf"
+                }
+            }
+        }
+    },
+    "task_setting": {
+        "group_size": 1,
+        "data_path": "./data",
+        "pseudo_path": "./pseudo",
+        "commands": {
+            "cp": "mpirun -n 64 cp.x"
+        },
+        "backward_list": [
+            "*/*.wfc"
+        ],
+        "backward_dir_name": "back"
+    }
+}
