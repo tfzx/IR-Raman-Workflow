@@ -96,7 +96,7 @@ def complete_qe(input_params: Dict[str, dict], calculation: Optional[str] = None
         else:
             kpoints = {
                 "type": "crystal",
-                "k_grid": kmesh(*k_grid)
+                "k_points": kmesh(*k_grid)
             }
     return input_params, kpoints
 
