@@ -61,5 +61,5 @@ class CalWC(OP):
         return cal_wc_h2o(
             wfc.reshape(confs.get_nframes(), -1, 3), 
             confs["coords"][:, confs["atom_types"] == 0], 
-            np.diagonal(confs["cells"], axis1 = -2, axis2 = -1)
+            confs["cells"]
         ).reshape(confs.get_nframes(), -1)
