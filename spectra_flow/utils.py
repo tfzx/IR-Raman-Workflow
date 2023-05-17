@@ -138,7 +138,10 @@ def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
     # nl = np.floor(np.sum(dx[..., np.newaxis] * recip_cell, axis = -2) * 2)[..., np.newaxis]
     # return dx - np.sum((nl + nl % 2) * cell / 2, axis = -2)
 
-def do_pbe(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
+def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    '''
+    Translate to the home cell.
+    '''
     frac_c = to_frac(coords, cells)[..., np.newaxis]
     return coords - np.sum(np.floor(frac_c) * cells, axis = -2)
 
