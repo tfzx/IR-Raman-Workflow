@@ -27,7 +27,11 @@ class TestWC(unittest.TestCase):
         wc_op = CalWC()
         op_in = {
             "confs": self.confs,
-            "wannier_function_centers": self.wfc
+            "wannier_function_centers": self.wfc,
+            "conf_fmt": {
+                "fmt": "deepmd/raw",
+                "type_map": ["O", "H"]
+            }
         }
         op_out = wc_op.execute(op_in)
         wc = np.loadtxt(op_out["wannier_centroid"]["ori"], dtype = float)

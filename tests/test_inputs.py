@@ -186,13 +186,13 @@ class TestInputs(unittest.TestCase):
                 "cell": None
             }
         )
-        self.assertTrue((np.abs(kpoints["k_grid"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all())
-        kpoints["k_grid"] = True
+        self.assertTrue((np.abs(kpoints["k_points"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all())
+        kpoints["k_points"] = True
         self.assertDictEqual(
             kpoints,
             {
                 "type": "crystal",
-                "k_grid": True
+                "k_points": True
             }
         )
 
@@ -237,13 +237,13 @@ class TestInputs(unittest.TestCase):
                 "cell": None
             }
         )
-        self.assertTrue((np.abs(kpoints["k_grid"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all())
-        kpoints["k_grid"] = True
+        self.assertTrue((np.abs(kpoints["k_points"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all())
+        kpoints["k_points"] = True
         self.assertDictEqual(
             kpoints,
             {
                 "type": "crystal",
-                "k_grid": True
+                "k_points": True
             }
         )
 

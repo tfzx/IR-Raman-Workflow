@@ -27,6 +27,10 @@ class TestPrepare(unittest.TestCase):
             "input_setting": {},
             "task_setting": {"group_size": group_size},
             "confs": self.confs,
+            "conf_fmt": {
+                "fmt": "deepmd/raw",
+                "type_map": ["O", "H"]
+            },
             "pseudo": self.pseudo
         })
         op_out = prepare.execute(op_in)
