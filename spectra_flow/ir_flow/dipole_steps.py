@@ -39,7 +39,8 @@ class DipoleSteps(Steps):
         }
         self._input_artifacts = {
             "confs": InputArtifact(),
-            "pseudo": InputArtifact()
+            "pseudo": InputArtifact(),
+            "cal_wc_python": InputArtifact(optional = True)
         }
         self._output_artifacts = {
             "backward": OutputArtifact(),
@@ -77,6 +78,7 @@ class DipoleSteps(Steps):
         conf_fmt = self.inputs.parameters["conf_fmt"]
         confs_artifact = self.inputs.artifacts["confs"]
         pseudo_artifact = self.inputs.artifacts["pseudo"]
+        cal_wc_python = self.inputs.artifacts["cal_wc_python"]
         mlwf_step = Step(
             name = "cal-MLWF",
             template = mlwf_template,
@@ -98,8 +100,12 @@ class DipoleSteps(Steps):
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages
             ),
+            parameters = {
+                "conf_fmt": conf_fmt
+            },
             artifacts={
                 "confs": confs_artifact,
+                "cal_wc_python": cal_wc_python,
                 "wannier_function_centers": mlwf_step.outputs.artifacts["wannier_function_centers"]
             },
             executor = wc_executor

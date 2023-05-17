@@ -81,6 +81,31 @@ def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dp
                     conf = conf_from_npz(np.load(conf_path), type_map)
     return conf
 
+def k_nearest(coords_A: np.ndarray, coords_B: np.ndarray, box: np.ndarray, k: int):
+    """
+        For each point in coords_A, choose the k-nearest points (in the box) among coords_B, and return the index.
+        The distance is calculated in the sense of PBC.
+
+        Parameters
+        -------------
+            coords_A (..., num_A, d): the coordinates of the central points. The size of the last axis is the dimension.
+            coords_B (..., num_B, d): the coordinates of the points to be selected.
+            box      (..., d): the PBC box. box[..., i] is the length of period along x_i.
+            k: int, the number of the points selected from coords_B.
+
+        Return
+        -------------
+            index (..., num_A, k): the index of the k-nearest points in coords_B.
+    """
+    distance = np.linalg.norm(
+        box_shift(
+            coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :], 
+            box[..., np.newaxis, np.newaxis, :]
+        ), 
+        ord = 2, axis = -1
+    )
+    return np.argsort(distance, axis = -1)[..., :k]
+
 def box_shift(dx: np.ndarray, box: np.ndarray):
     nl = np.floor(dx / (box / 2))
     return dx - (nl + (nl + 2) % 2) * box / 2
