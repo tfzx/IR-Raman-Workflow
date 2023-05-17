@@ -9,7 +9,7 @@ from dflow.python import (
     BigParameter,
 )
 from spectra_flow.post.cal_dipole import calculate_dipole_h2o
-from spectra_flow.utils import read_conf
+from spectra_flow.utils import read_conf, do_pbe
 
 class CalTotalDipole(OP):
     def __init__(self) -> None:
@@ -46,10 +46,9 @@ class CalTotalDipole(OP):
     
     def cal_dipole(self, confs: dpdata.System, wc: np.ndarray) -> np.ndarray:
         mask_O = confs["atom_types"] == 0
-        box = np.diagonal(confs["cells"], axis1 = -2, axis2 = -1)
-        coords = confs["coords"] % box.reshape(-1, 1, 3)
+        coords = do_pbe(confs["coords"], confs["cells"][..., np.newaxis, :, :])
         nframes = confs.get_nframes()
         wc = wc.reshape(nframes, -1, 3)
         return calculate_dipole_h2o(
-            coords[:, mask_O], coords[:, ~mask_O], box, wc, r_bond = 1.2
+            coords[:, mask_O], coords[:, ~mask_O], confs["cells"], wc, r_bond = 1.2
         ).reshape(nframes, -1)

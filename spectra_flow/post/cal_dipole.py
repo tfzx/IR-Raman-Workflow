@@ -1,12 +1,9 @@
 import numpy as np
+from spectra_flow.utils import box_shift
 
-def box_shift(dx: np.ndarray, box: np.ndarray):
-    nl = np.floor(dx / (box / 2))
-    return dx - (nl + (nl + 2) % 2) * box / 2
-
-def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, r_bond: float, mask_sel: np.ndarray = None):
+def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, r_bond: float, mask_sel: np.ndarray = None):
     coords_sel = coords_sel[..., np.newaxis, :]
-    delta = box_shift(coords_oth[..., np.newaxis, :, :] - coords_sel, box[..., np.newaxis, np.newaxis, :])
+    delta = box_shift(coords_oth[..., np.newaxis, :, :] - coords_sel, cells[..., np.newaxis, np.newaxis, :, :])
     mask = np.linalg.norm(delta, 2, axis = -1, keepdims = True) < r_bond
     if mask_sel is not None:
         mask &= mask_sel[..., np.newaxis, np.newaxis]
@@ -17,14 +14,15 @@ def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray,
     num_nb[num_nb == 0] = 1
     coords_oth[...] = ans / num_nb
 
-def fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, r_bond: float):
-    c = np.concatenate([coords_sel, coords_oth, box[..., np.newaxis, :]], axis = -2).reshape(coords_sel.shape[0], -1)
+def fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, r_bond: float):
+    c = np.concatenate([coords_sel, coords_oth, cells], axis = -2).reshape(coords_sel.shape[0], -1)
     num_sel = coords_sel.shape[-2]
     def fix(arr):
         arr = arr.reshape(-1, 3)
         c_sel = arr[:num_sel]
-        c_oth = arr[num_sel:-1]
-        b = arr[[-1]]
+        c_oth = arr[num_sel:-3]
+        b = arr[-3:]
+        # TODO: consider general cells!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
         mask_sel = np.abs(box_shift(c_sel, b)).min(axis = -1) < 2 * r_bond
         mask_oth = np.abs(box_shift(c_oth, b)).min(axis = -1) < r_bond
         c_sel_small = c_sel[mask_sel, :]
@@ -35,10 +33,10 @@ def fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, 
     np.apply_along_axis(fix, axis = -1, arr = c)
     return c.reshape(coords_sel.shape[0], -1, 3)[:, num_sel:-1, :]
 
-def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, box: np.ndarray, wannier: np.ndarray, r_bond = 1.2) -> np.ndarray:
-    coords_oth = fix_coords(coords_sel, coords_oth, box, r_bond)
+def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, wannier: np.ndarray, r_bond = 1.2) -> np.ndarray:
+    coords_oth = fix_coords(coords_sel, coords_oth, cells, r_bond)
     total_dipole = np.sum(coords_oth, axis = 1) - np.sum(coords_sel, axis = 1) * 2. - np.sum(wannier, axis = 1) * 8.
-    vol = np.prod(box, axis = -1, keepdims = True)
+    vol = np.linalg.det(cells)[..., np.newaxis]
     return total_dipole / np.sqrt(vol) * np.sqrt(0.52917721067)
 
 if __name__ == '__main__':

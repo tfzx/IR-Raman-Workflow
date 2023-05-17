@@ -1,12 +1,8 @@
 import numpy as np
 import dpdata
-from spectra_flow.utils import k_nearest
+from spectra_flow.utils import k_nearest, box_shift
 
-def box_shift(dx: np.ndarray, box: np.ndarray):
-    nl = np.floor(dx / (box / 2))
-    return dx - (nl + (nl + 2) % 2) * box / 2
-
-def cal_wc_h2o(wfc: np.ndarray, coords_O: np.ndarray, box: np.ndarray) -> np.ndarray:
+def cal_wc_h2o(wfc: np.ndarray, coords_O: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
         Calculate the wannier centroids for system of H2O.
 
@@ -20,13 +16,13 @@ def cal_wc_h2o(wfc: np.ndarray, coords_O: np.ndarray, box: np.ndarray) -> np.nda
         -------------
             wannier centroids (..., num_O, 3): the wannier centroid relative to each O atoms.
     """
-    idx = k_nearest(coords_O, wfc, box, k = 4)
-    wc = np.take_along_axis(wfc[..., np.newaxis, :, :], idx[..., np.newaxis], axis = -2)
-    return np.mean(box_shift(wc - coords_O[..., np.newaxis, :], box[..., np.newaxis, np.newaxis, :]), axis = -2)
+    idx = k_nearest(coords_O, wfc, cells, k = 4)
+    wfc = np.take_along_axis(wfc[..., np.newaxis, :, :], idx[..., np.newaxis], axis = -2)
+    return np.mean(box_shift(wfc - coords_O[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :]), axis = -2)
 
 def cal_wc(confs: dpdata.System, wfc: np.ndarray) -> np.ndarray:
         return cal_wc_h2o(
             wfc.reshape(confs.get_nframes(), -1, 3), 
             confs["coords"][:, confs["atom_types"] == 0], 
-            np.diagonal(confs["cells"], axis1 = -2, axis2 = -1)
+            confs["cells"]
         ).reshape(confs.get_nframes(), -1)

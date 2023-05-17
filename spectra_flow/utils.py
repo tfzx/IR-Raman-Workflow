@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union, IO
+from typing import Dict, List, Optional, Tuple, Union, IO
 from tempfile import TemporaryFile
 import numpy as np
 from copy import deepcopy
@@ -81,7 +81,18 @@ def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dp
                     conf = conf_from_npz(np.load(conf_path), type_map)
     return conf
 
-def k_nearest(coords_A: np.ndarray, coords_B: np.ndarray, box: np.ndarray, k: int):
+def write_to_diagonal(a: np.ndarray, diag: np.ndarray, offset: int = 0, axis1: int = 0, axis2: int = 1):
+    diag_slices = [slice(None) for _ in a.shape]
+    start_idx = [max(-offset, 0), max(offset, 0)]
+    diag_len = min(a.shape[axis1] - start_idx[0], a.shape[axis2] - start_idx[1])
+    assert diag_len >= 0
+    if diag_len == 0:
+        return
+    diag_slices[axis1] = list(range(start_idx[0], start_idx[0] + diag_len))
+    diag_slices[axis2] = list(range(start_idx[1], start_idx[1] + diag_len))
+    a[tuple(diag_slices)] = diag
+
+def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.ndarray, k: int):
     """
         For each point in coords_A, choose the k-nearest points (in the box) among coords_B, and return the index.
         The distance is calculated in the sense of PBC.
@@ -97,39 +108,64 @@ def k_nearest(coords_A: np.ndarray, coords_B: np.ndarray, box: np.ndarray, k: in
         -------------
             index (..., num_A, k): the index of the k-nearest points in coords_B.
     """
+    self_comp = False
+    if coords_B is None:
+        coords_B = coords_A
+        self_comp = True
     distance = np.linalg.norm(
         box_shift(
             coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :], 
-            box[..., np.newaxis, np.newaxis, :]
+            cells[..., np.newaxis, np.newaxis, :, :]
         ), 
         ord = 2, axis = -1
     )
+    if self_comp:
+        write_to_diagonal(distance, np.inf, offset = 0, axis1 = -2, axis2 = -1)
     return np.argsort(distance, axis = -1)[..., :k]
 
-def box_shift(dx: np.ndarray, box: np.ndarray):
-    nl = np.floor(dx / (box / 2))
-    return dx - (nl + (nl + 2) % 2) * box / 2
+def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    recip_cell = np.zeros_like(cells)
+    recip_cell[..., :, 0] = np.cross(cells[..., 1, :], cells[..., 2, :])
+    recip_cell[..., :, 1] = np.cross(cells[..., 2, :], cells[..., 0, :])
+    recip_cell[..., :, 2] = np.cross(cells[..., 0, :], cells[..., 1, :])
+    vol = np.sum(recip_cell[..., :, 0] * cells[..., 0, :], axis = -1)
+    recip_cell /= vol[..., np.newaxis, np.newaxis]
+    return np.sum(coords[..., np.newaxis] * recip_cell, axis = -2)
 
-def _check_coords(coords: np.ndarray, box: np.ndarray, eps: float) -> bool:
-    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], box[..., np.newaxis, np.newaxis, :])
+def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    frac_c = to_frac(dx, cells)[..., np.newaxis]
+    return dx - np.sum(np.round(frac_c) * cells, axis = -2)
+    # nl = np.floor(np.sum(dx[..., np.newaxis] * recip_cell, axis = -2) * 2)[..., np.newaxis]
+    # return dx - np.sum((nl + nl % 2) * cell / 2, axis = -2)
+
+def do_pbe(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    frac_c = to_frac(coords, cells)[..., np.newaxis]
+    return coords - np.sum(np.floor(frac_c) * cells, axis = -2)
+
+
+def _check_coords(coords: np.ndarray, cells: np.ndarray, eps: float) -> bool:
+    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :])
     mask = np.linalg.norm(delta, 2, axis = -1) < eps
     np.fill_diagonal(mask, False)
     return not mask.any()
 
-def check_coords(coords: np.ndarray, box: np.ndarray, eps: float):
-    c = np.concatenate([coords, box[..., np.newaxis, :]], axis = -2).reshape(coords.shape[0], -1)
+def check_coords(coords: np.ndarray, cells: np.ndarray, eps: float):
+    c = np.concatenate([coords, cells], axis = -2).reshape(coords.shape[0], -1)
     def check(arr: np.ndarray):
         arr = arr.reshape(-1, 3)
-        c = arr[:-1]
-        b = arr[-1]
+        c = arr[:-3]
+        b = arr[-3:]
         return _check_coords(c, b, eps)
     return np.apply_along_axis(check, axis = -1, arr = c)
 
-def filter_confs(confs: dpdata.System, tensor: np.ndarray):
-    mask = check_coords(confs["coords"], confs["cells"].diagonal(offset = 0, axis1 = 1, axis2 = 2), eps = 1e-3)
+def filter_confs(confs: dpdata.System, tensor: np.ndarray = None):
+    mask = check_coords(confs["coords"], confs["cells"], eps = 1e-3)
     confs = confs.sub_system(np.nonzero(mask)[0].tolist())
-    tensor = tensor[mask, ...]
-    return confs, tensor
+    if tensor:
+        tensor = tensor[mask, ...]
+        return confs, tensor
+    else:
+        return confs
 
 '''
 def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int):
