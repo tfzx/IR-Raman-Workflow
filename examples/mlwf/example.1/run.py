@@ -36,7 +36,7 @@ if __name__ == "__main__":
         wc_executor = cal_executor
     )
 
-    import spectra_flow.post.cal_wannier_centroid
+    import spectra_flow.post.cal_dipole
     cal_dipole_step = Step(
         name = "Dipole-Step",
         template = dipole_template,
@@ -52,7 +52,7 @@ if __name__ == "__main__":
             "confs": upload_artifact("./data"),
             "pseudo": upload_artifact("./pseudo"),
             # Optional, upload the python file to calculate wannier centroid.
-            "cal_wc_python": upload_artifact(spectra_flow.post.cal_wannier_centroid.__file__)
+            "cal_dipole_python": upload_artifact(spectra_flow.post.cal_dipole.__file__)
         }
     )
 

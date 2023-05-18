@@ -1,5 +1,5 @@
 import numpy as np, dpdata
-from spectra_flow.utils import k_nearest, box_shift
+from spectra_flow.utils import k_nearest, box_shift, do_pbc
 
 def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, r_bond: float, mask_sel: np.ndarray = None):
     coords_sel = coords_sel[..., np.newaxis, :]
@@ -60,31 +60,17 @@ def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: 
     return total_dipole / np.sqrt(vol) * np.sqrt(0.52917721067)
 
 def cal_wc(confs: dpdata.System, wfc: np.ndarray) -> np.ndarray:
-        return cal_wc_h2o(
-            wfc.reshape(confs.get_nframes(), -1, 3), 
-            confs["coords"][:, confs["atom_types"] == 0], 
-            confs["cells"]
-        ).reshape(confs.get_nframes(), -1)
+    return cal_wc_h2o(
+        wfc.reshape(confs.get_nframes(), -1, 3), 
+        confs["coords"][:, confs["atom_types"] == 0], 
+        confs["cells"]
+    ).reshape(confs.get_nframes(), -1)
 
-if __name__ == '__main__':
-    type_O, type_H = 0, 1
-    amplif = 10.0
-    a0 = 0.52917721067
-    debye2ea=0.20819434
-    dt = 0.0003
-
-    coords = np.loadtxt('coord.raw')[:1]
-    cells = np.loadtxt('box.raw')[:1]
-    types = np.loadtxt('type.raw', dtype = int)
-    wannier = np.loadtxt('dipole.raw')[:1]
-
-    nFrames = coords.shape[0]
-    nAtoms = int(coords.shape[1] / 3)
-    coords = coords.reshape(nFrames, -1, 3)
-    wannier = wannier.reshape(nFrames, -1, 3) / (4 * amplif)
-    box = cells.reshape(nFrames, 3, 3).diagonal(offset = 0, axis1 = 1, axis2 = 2)
-
-    coords_O = coords[:, types == type_O, :]
-    coords_H = coords[:, types == type_H, :]
-    total_dipole = calculate_dipole_h2o(coords_O, coords_H, box, wannier)
-    print(total_dipole)
+def cal_dipole(confs: dpdata.System, wc: np.ndarray) -> np.ndarray:
+    mask_O = confs["atom_types"] == 0
+    coords = do_pbc(confs["coords"], confs["cells"][..., np.newaxis, :, :])
+    nframes = confs.get_nframes()
+    wc = wc.reshape(nframes, -1, 3)
+    return calculate_dipole_h2o(
+        coords[:, mask_O], coords[:, ~mask_O], confs["cells"], wc, r_bond = 1.2
+    ).reshape(nframes, -1)

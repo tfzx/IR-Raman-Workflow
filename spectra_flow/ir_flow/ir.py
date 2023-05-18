@@ -97,6 +97,18 @@ class IRinputs:
             "predict": ["dwann_model"],
             "cal_ir": ["total_dipole"]
         }
+        self.optional_parameters: Dict[str, List[str]] = {
+            "dipole": [],
+            "train": [],
+            "predict": [],
+            "cal_ir": []
+        }
+        self.optional_artifacts: Dict[str, List[str]] = {
+            "dipole": ["cal_dipole_python"],
+            "train": [],
+            "predict": ["cal_dipole_python"],
+            "cal_ir": []
+        }
         if run_config["provide_sample"]:
             self.run_input_parameters["predict"] += ["sys_fmt"]
             self.run_input_artifacts["predict"] += ["sampled_system"]
@@ -111,14 +123,18 @@ class IRinputs:
     def get_inputs_list(self):
         input_parameters = set()
         input_artifacts = set()
+        optional_parameters = set()
+        optional_artifacts = set()
         for i in self.run_range:
             step = self.step_list[i]
             input_parameters.update(self.run_input_parameters[step])
             input_artifacts.update(self.run_input_artifacts[step])
+            optional_parameters.update(self.optional_parameters[step])
+            optional_artifacts.update(self.optional_artifacts[step])
         start_steps = self.run_config["start_steps"]
         input_parameters.update(self.start_input_parameters[start_steps])
         input_artifacts.update(self.start_input_artifacts[start_steps])
-        return list(input_parameters), list(input_artifacts)
+        return list(input_parameters), list(input_artifacts), list(optional_parameters), list(optional_artifacts)
 
 
 class IRchecker:
@@ -204,13 +220,20 @@ class IRchecker:
             }
         return run_config
 
-    def get_inputs(self, input_parameters_l: List[str], input_artifacts_l: List[str]):
+    def get_inputs(self, 
+                   input_parameters_l: List[str], 
+                   input_artifacts_l: List[str], 
+                   optional_parameters_l: List[str],
+                   optional_artifacts_l: List[str],
+        ):
         self._input_parameters = {}
         self._input_artifacts = {}
         for key in input_parameters_l:
             self._read_parameters(key)
         for key in input_artifacts_l:
             self._read_artifacts(key)
+        for key in optional_artifacts_l:
+            self._read_optional_artifacts(key)
         return self._input_parameters, self._input_artifacts
 
     def _default(self):
@@ -237,12 +260,15 @@ class IRchecker:
             "init_conf": lambda: self.load_system("init_conf"),
             "pseudo": lambda: self.uploads["other"]["pseudo"],
             "train_label": lambda: self.uploads["other"]["train_label"],
-            "total_dipole": lambda: self.uploads["other"]["total_dipole"],
+            "total_dipole": lambda: self.uploads["other"]["total_dipole"]
         }
         self._sys_fmt_map = {
             "train_confs": "train_conf_fmt",
             "sampled_system": "sys_fmt",
             "init_conf": "init_conf_fmt",
+        }
+        self._optional_a_reader = {
+            "cal_dipole_python": lambda: self.uploads["other"]["cal_dipole_python"]
         }
 
     def _read_parameters(self, key: str):
@@ -259,6 +285,14 @@ class IRchecker:
             self._input_parameters[self._sys_fmt_map[key]] = out[1]
         else:
             self._input_artifacts[key] = out
+
+    def _read_optional_artifacts(self, key: str):
+        fun = self._optional_a_reader[key]
+        try:
+            out = fun()
+            self._input_artifacts[key] = out
+        except KeyError:
+            pass
 
     def check_provide_sample(self):
         return "sampled_system" in self.uploads["system"]
@@ -369,10 +403,21 @@ class IRflow(Steps):
         self.run_config = run_config
         self.executors = executors
         ir_inputs = IRinputs(run_config)
-        input_parameters_l, input_artifacts_l = ir_inputs.get_inputs_list()
+        (
+            input_parameters_l, 
+            input_artifacts_l,
+            optional_parameters_l,
+            optional_artifacts_l
+        ) = ir_inputs.get_inputs_list()
+
         print("IRflow: inputs_list: ")
         print("parameters:", input_parameters_l)
         print("artifacts:", input_artifacts_l)
+        print("optional parameters:", optional_parameters_l)
+        print("optional artifacts:", optional_artifacts_l)
+
+        input_parameters_l += optional_parameters_l
+        input_artifacts_l += optional_artifacts_l
         _input_parameters_temp = {
             "global": InputParameter(type = dict, value = {}),
             "input_setting": InputParameter(type = dict, value = {}),
@@ -385,12 +430,13 @@ class IRflow(Steps):
         _input_artifacts_temp = {
             "dp_model": InputArtifact(),
             "dwann_model": InputArtifact(),
-            "pseudo": InputArtifact(optional = True),
+            "pseudo": InputArtifact(),
             "train_confs": InputArtifact(),
             "sampled_system": InputArtifact(),
             "init_conf": InputArtifact(),
             "train_label": InputArtifact(),
-            "total_dipole": InputArtifact()
+            "total_dipole": InputArtifact(),
+            "cal_dipole_python": InputArtifact(optional = True)
         }
         _output_artifacts_temp = {
             "dipole": ["wannier_centroid"],
@@ -476,7 +522,8 @@ class IRflow(Steps):
                 },
                 artifacts = {
                     "confs": self.inputs.artifacts["train_confs"],
-                    "pseudo": self.inputs.artifacts["pseudo"]
+                    "pseudo": self.inputs.artifacts["pseudo"],
+                    "cal_dipole_python": self.inputs.artifacts["cal_dipole_python"]
                 }
             )
             out = {
@@ -594,7 +641,8 @@ class IRflow(Steps):
             },
             artifacts = {
                 "sampled_system": sampled_system,
-                "dwann_model": dwann_model
+                "dwann_model": dwann_model,
+                "cal_dipole_python": self.inputs.artifacts["cal_dipole_python"]
             }
         )
         

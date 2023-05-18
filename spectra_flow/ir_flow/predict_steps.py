@@ -35,6 +35,7 @@ class PredictSteps(Steps):
         self._input_artifacts = {
             "sampled_system": InputArtifact(),
             "dwann_model": InputArtifact(),
+            "cal_dipole_python": InputArtifact(optional = True)
         }
         self._output_artifacts = {
             "predicted_wc": OutputArtifact(),
@@ -68,6 +69,7 @@ class PredictSteps(Steps):
         sys_fmt = self.inputs.parameters["sys_fmt"]
         sampled_system_artifact = self.inputs.artifacts["sampled_system"]
         dwann_model_artifact = self.inputs.artifacts["dwann_model"]
+        cal_dipole_python = self.inputs.artifacts["cal_dipole_python"]
         
         predict_dipole = Step(
             "predict-dipole",
@@ -97,6 +99,7 @@ class PredictSteps(Steps):
             ),
             artifacts={
                 "confs": sampled_system_artifact,
+                "cal_dipole_python": cal_dipole_python,
                 "wannier_centroid": predict_dipole.outputs.artifacts["predicted_tensor"]
             },
             parameters = {

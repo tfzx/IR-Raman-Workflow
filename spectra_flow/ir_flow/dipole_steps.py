@@ -40,7 +40,7 @@ class DipoleSteps(Steps):
         self._input_artifacts = {
             "confs": InputArtifact(),
             "pseudo": InputArtifact(),
-            "cal_wc_python": InputArtifact(optional = True)
+            "cal_dipole_python": InputArtifact(optional = True)
         }
         self._output_artifacts = {
             "backward": OutputArtifact(),
@@ -78,7 +78,7 @@ class DipoleSteps(Steps):
         conf_fmt = self.inputs.parameters["conf_fmt"]
         confs_artifact = self.inputs.artifacts["confs"]
         pseudo_artifact = self.inputs.artifacts["pseudo"]
-        cal_wc_python = self.inputs.artifacts["cal_wc_python"]
+        cal_dipole_python = self.inputs.artifacts["cal_dipole_python"]
         mlwf_step = Step(
             name = "cal-MLWF",
             template = mlwf_template,
@@ -105,7 +105,7 @@ class DipoleSteps(Steps):
             },
             artifacts={
                 "confs": confs_artifact,
-                "cal_wc_python": cal_wc_python,
+                "cal_dipole_python": cal_dipole_python,
                 "wannier_function_centers": mlwf_step.outputs.artifacts["wannier_function_centers"]
             },
             executor = wc_executor

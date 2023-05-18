@@ -31,6 +31,8 @@
             }
         },
 
-        "other": {}
+        "other": {
+            "cal_dipole_python": "cal_dipole.py"
+        }
     }
 }

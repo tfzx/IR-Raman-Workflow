@@ -11,7 +11,7 @@ from dflow.python import (
 from dflow.utils import (
     set_directory
 )
-from spectra_flow.post.cal_wannier_centroid import cal_wc_h2o
+from spectra_flow.post.cal_dipole import cal_wc_h2o
 from spectra_flow.utils import read_conf
 
 class CalWC(OP):
@@ -23,7 +23,7 @@ class CalWC(OP):
         return OPIOSign({
             "confs": Artifact(Path),
             "conf_fmt": BigParameter(dict),
-            "cal_wc_python": Artifact(Path, optional = True),
+            "cal_dipole_python": Artifact(Path, optional = True),
             "wannier_function_centers": Artifact(Dict[str, Path]),
         })
 
@@ -39,10 +39,10 @@ class CalWC(OP):
             op_in: OPIO,
     ) -> OPIO:
         confs = read_conf(op_in["confs"], op_in["conf_fmt"])
-        if op_in["cal_wc_python"]:
+        if op_in["cal_dipole_python"]:
             import imp
-            cal_wc_python = imp.load_source("wc_module", str(op_in["cal_wc_python"]))
-            cal_wc = cal_wc_python.cal_wc
+            cal_dipole_python = imp.load_source("dipole_module", str(op_in["cal_dipole_python"]))
+            cal_wc = cal_dipole_python.cal_wc
         else:
             cal_wc = self.cal_wc
         wfc_d = op_in["wannier_function_centers"]

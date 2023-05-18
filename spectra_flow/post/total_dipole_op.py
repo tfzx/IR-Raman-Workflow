@@ -21,6 +21,7 @@ class CalTotalDipole(OP):
             "confs": Artifact(Path),
             "conf_fmt": BigParameter(dict),
             "wannier_centroid": Artifact(Path),
+            "cal_dipole_python": Artifact(Path, optional = True),
         })
 
     @classmethod
@@ -37,7 +38,14 @@ class CalTotalDipole(OP):
         conf_fmt: dict = op_in["conf_fmt"]
         confs = read_conf(op_in["confs"], conf_fmt)
         wc = np.load(op_in["wannier_centroid"])
-        dipole = self.cal_dipole(confs, wc)
+        
+        if op_in["cal_dipole_python"]:
+            import imp
+            cal_dipole_python = imp.load_source("dipole_module", str(op_in["cal_dipole_python"]))
+            cal_dipole = cal_dipole_python.cal_dipole
+        else:
+            cal_dipole = self.cal_dipole
+        dipole = cal_dipole(confs, wc)
         dipole_path = Path(f"total_dipole.npy")
         np.save(dipole_path, dipole)
         return OPIO({
