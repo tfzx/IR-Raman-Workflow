@@ -1,16 +1,11 @@
-from typing import Dict, List, Tuple, Union
 from pathlib import Path
-import dpdata, numpy as np, json, abc
+import dpdata, numpy as np, abc, importlib
 from dflow.python import (
     OP, 
     OPIO, 
     Artifact, 
     OPIOSign, 
     BigParameter,
-)
-from dflow.utils import (
-    set_directory,
-    run_command
 )
 from spectra_flow.dp.infer import model_eval
 from spectra_flow.utils import read_conf
@@ -55,7 +50,7 @@ class DpPredict(OP, abc.ABC):
 
 class DWannPredict(DpPredict):
     def eval(self, frozen_model, dp_setting: dict, smp_sys: dpdata.System) -> np.ndarray:
-        from deepmd.infer import DeepDipole
+        DeepDipole = importlib.import_module("deepmd.infer").DeepDipole
         deep_wannier = DeepDipole(frozen_model)
         predicted_wc = model_eval(deep_wannier, smp_sys)
         if "amplif" in dp_setting:
@@ -64,7 +59,7 @@ class DWannPredict(DpPredict):
 
 class DPolarPredict(DpPredict):
     def eval(self, frozen_model, dp_setting: dict, smp_sys: dpdata.System) -> np.ndarray:
-        from deepmd.infer import DeepPolar
+        DeepPolar = importlib.import_module("deepmd.infer").DeepPolar
         deep_polar = DeepPolar(frozen_model)
         predicted_polar = model_eval(deep_polar, smp_sys)
         return predicted_polar
