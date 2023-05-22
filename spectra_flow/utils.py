@@ -43,9 +43,9 @@ def bohrium_login(account_config: dict = None):
     if account_config:
         bohrium.config.update(account_config)
     else:
-        bohrium.config["username"] = input("Bohrium username: ")
+        bohrium.config["username"] = getpass("Bohrium username: ")
         bohrium.config["password"] = getpass("Bohrium password: ")
-        bohrium.config["project_id"] = input("Project ID: ")
+        bohrium.config["project_id"] = getpass("Project ID: ")
     s3_config["repo_key"] = "oss-bohrium"
     s3_config["storage_client"] = TiefblueClient()
 

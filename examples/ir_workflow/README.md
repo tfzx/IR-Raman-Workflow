@@ -35,16 +35,16 @@
 
 For `global["config"]["global"]`, the default parameters is:
 ```json
-    "global": {
-        "name": "system",
-        "calculation": "ir",
-        "type_map": [],         # Reauired!
-        "mass_map": [],         # Required! The mass of each atom. 
-        "read_buffer": 50000,   # Optional. The buffer size while reading the lammps dump file.
-        "dt": 0.0003,
-        "nstep": 10000,         # The number of steps of sampleing
-        "window": 1000,         # The number of 't' for correlation function.
-        "temperature": 300,
-        "width": 240            # The width of Gaussian filter. Smooth factor.
-    }
+"global": {
+    "name": "system",
+    "calculation": "ir",
+    "type_map": [],         # Reauired!
+    "mass_map": [],         # Required! The mass of each atom. 
+    "read_buffer": 50000,   # Optional. The buffer size while reading the lammps dump file.
+    "dt": 0.0003,
+    "nstep": 10000,         # The number of steps of sampleing
+    "window": 1000,         # The number of 't' for correlation function.
+    "temperature": 300,
+    "width": 240            # The width of Gaussian filter. Smooth factor.
+}
 ```
