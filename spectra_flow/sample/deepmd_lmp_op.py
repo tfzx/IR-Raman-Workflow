@@ -75,7 +75,7 @@ class DpLmpSample(OP):
             "pair_style      deepmd dp_model.pb",
             "pair_coeff      * *",
             f"velocity       all create {temperature} 18234589",
-            f"fix            1 all nvt temp {temperature} {temperature} {100 * dt}",
+            f"fix            1 all nve",
             "dump            1 all custom 1 system.dump id type x y z vx vy vz",
             f"timestep       {dt}",
             "thermo_style    custom step vol temp pe ke etotal press pxx pyy pzz pxy pxz pyz",
