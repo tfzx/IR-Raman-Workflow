@@ -24,6 +24,7 @@ class PrepPolar(OP, abc.ABC):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
+            "global": BigParameter(dict),
             "input_setting": BigParameter(dict)
         })
 
@@ -39,9 +40,10 @@ class PrepPolar(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
+        global_config: dict = op_in["global"]
         input_setting["with_efield"] = True
-        eps = input_setting["polar_params"]["eps_efield"]
-        if input_setting["polar_params"]["central_diff"]:
+        eps = global_config["eps_efield"]
+        if global_config["central_diff"]:
             input_setting["efields"] = {
                 "xp": [eps, 0.0, 0.0],
                 "xm": [-eps, 0.0, 0.0],
