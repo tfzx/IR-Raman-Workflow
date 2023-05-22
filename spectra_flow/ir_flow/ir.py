@@ -303,6 +303,7 @@ class IRchecker:
         return if_run
 
     def check_dipole(self):
+        # TODO: check whether the inputs are valid.
         if_run = "dipole" in self.config
         if_run = if_run and "train_confs" in self.uploads["system"]
         if_start = if_run

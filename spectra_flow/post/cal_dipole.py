@@ -15,6 +15,9 @@ def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarra
     coords_oth[...] = ans / num_nb
 
 def fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, r_bond: float):
+    """
+        TODO: parallel
+    """
     c = np.concatenate([coords_sel, coords_oth, cells], axis = -2).reshape(coords_sel.shape[0], -1)
     num_sel = coords_sel.shape[-2]
     def fix(arr):

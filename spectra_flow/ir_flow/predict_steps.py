@@ -8,6 +8,7 @@ from dflow import (
     Outputs,
     InputParameter,
     InputArtifact,
+    OutputParameter,
     OutputArtifact
 )
 from dflow.io import Inputs, Outputs
@@ -18,39 +19,36 @@ from dflow.python import (
 )
 from dflow.step import Step
 import spectra_flow
+from spectra_flow.base_workflow import BasicSteps
 from spectra_flow.post.total_dipole_op import CalTotalDipole
 from spectra_flow.dp.dp_predict import DWannPredict
 
-class PredictSteps(Steps):
+class PredictSteps(BasicSteps):
+    @classmethod
+    def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
+        return {
+            "dp_setting": InputParameter(type = dict, value = {}),
+            "sys_fmt": InputParameter(type = dict, value = {}),
+        }, {
+            "sampled_system": InputArtifact(),
+            "dwann_model": InputArtifact(),
+            "cal_dipole_python": InputArtifact(optional = True)
+        }
+    
+    @classmethod
+    def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
+        return {}, {
+            "predicted_wc": OutputArtifact(),
+            "total_dipole": OutputArtifact(),
+        }
+
     def __init__(self, 
             name: str,
             predict_executor: Executor,
             cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]] = None
         ):
-        self._input_parameters = {
-            "dp_setting": InputParameter(type = dict, value = {}),
-            "sys_fmt": InputParameter(type = dict, value = {}),
-        }
-        self._input_artifacts = {
-            "sampled_system": InputArtifact(),
-            "dwann_model": InputArtifact(),
-            "cal_dipole_python": InputArtifact(optional = True)
-        }
-        self._output_artifacts = {
-            "predicted_wc": OutputArtifact(),
-            "total_dipole": OutputArtifact(),
-        }
-        super().__init__(
-            name = name,
-            inputs = Inputs(
-                parameters = self._input_parameters,
-                artifacts = self._input_artifacts
-            ),
-            outputs = Outputs(
-                artifacts = self._output_artifacts
-            )
-        )
+        super().__init__(name)
         if not upload_python_packages:
             upload_python_packages = spectra_flow.__path__
         self.build_steps(

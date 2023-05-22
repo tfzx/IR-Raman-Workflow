@@ -1,6 +1,7 @@
 from typing import Dict, List, Tuple, Union
 from pathlib import Path
 from dflow import (
+    OutputParameter,
     Step,
     Steps,
     Executor,
@@ -16,6 +17,7 @@ from dflow.python import (
     OP
 )
 import spectra_flow
+from spectra_flow.base_workflow import BasicSteps
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
@@ -23,7 +25,27 @@ from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 # from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
 # from mlwf_op.collect_wannier90 import CollectWann
 
-class DipoleSteps(Steps):
+class DipoleSteps(BasicSteps):
+    @classmethod
+    def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
+        return {
+            "input_setting": InputParameter(type = dict, value = {}),
+            "task_setting": InputParameter(type = dict, value = {}),
+            "conf_fmt": InputParameter(type = dict, value = {})
+        }, {
+            "confs": InputArtifact(),
+            "pseudo": InputArtifact(),
+            "cal_dipole_python": InputArtifact(optional = True)
+        }
+    
+    @classmethod
+    def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
+        return {}, {
+            "backward": OutputArtifact(),
+            "wannier_function_centers": OutputArtifact(),
+            "wannier_centroid": OutputArtifact()
+        }
+
     def __init__(
             self,
             name: str,
@@ -32,31 +54,7 @@ class DipoleSteps(Steps):
             wc_executor: Executor,
             upload_python_packages: List[Union[str, Path]] = None
         ):
-        self._input_parameters = {
-            "input_setting": InputParameter(type = dict, value = {}),
-            "task_setting": InputParameter(type = dict, value = {}),
-            "conf_fmt": InputParameter(type = dict, value = {})
-        }
-        self._input_artifacts = {
-            "confs": InputArtifact(),
-            "pseudo": InputArtifact(),
-            "cal_dipole_python": InputArtifact(optional = True)
-        }
-        self._output_artifacts = {
-            "backward": OutputArtifact(),
-            "wannier_function_centers": OutputArtifact(),
-            "wannier_centroid": OutputArtifact()
-        }
-        super().__init__(
-            name = name,
-            inputs = Inputs(
-                parameters = self._input_parameters,
-                artifacts = self._input_artifacts
-            ),
-            outputs = Outputs(
-                artifacts = self._output_artifacts
-            )
-        )
+        super().__init__(name)
         if not upload_python_packages:
             upload_python_packages = spectra_flow.__path__
         self.build_steps(
@@ -65,7 +63,7 @@ class DipoleSteps(Steps):
             wc_executor, 
             upload_python_packages
         )
-        
+    
     def build_steps(
             self, 
             mlwf_template: MLWFSteps,
