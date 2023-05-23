@@ -40,6 +40,7 @@ def bohrium_login(account_config: dict = None):
     from getpass import getpass
     config["host"] = "https://workflows.deepmodeling.com"
     config["k8s_api_server"] = "https://workflows.deepmodeling.com"
+    config["dispatcher_image_pull_policy"] = "IfNotPresent"
     if account_config:
         bohrium.config.update(account_config)
     else:
@@ -164,7 +165,7 @@ def check_coords(coords: np.ndarray, cells: np.ndarray, eps: float):
 def filter_confs(confs: dpdata.System, tensor: np.ndarray = None):
     mask = check_coords(confs["coords"], confs["cells"], eps = 1e-3)
     confs = confs.sub_system(np.nonzero(mask)[0].tolist())
-    if tensor:
+    if tensor is not None:
         tensor = tensor[mask, ...]
         return confs, tensor
     else:
