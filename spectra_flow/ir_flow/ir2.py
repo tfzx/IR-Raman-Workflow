@@ -28,10 +28,10 @@ from spectra_flow.ir_flow.dipole_steps import DipoleSteps
 from spectra_flow.ir_flow.train_steps import TrainDwannSteps
 from spectra_flow.ir_flow.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_steps import IRsteps
-from spectra_flow.sample.deepmd_lmp_op import DpLmpSample
+from spectra_flow.MD.md_steps import MDSteps
 
 class IRflow(AdaptFlow):
-    steps_list = [DipoleSteps, TrainDwannSteps, PredictSteps, IRsteps]
+    steps_list = [DipoleSteps, TrainDwannSteps, PredictSteps, IRsteps, MDSteps]
     @classmethod
     def get_io_dict(cls) -> Dict[BasicSteps, Dict[str, List[Tuple[BasicSteps, str]]]]:
         return {
@@ -49,10 +49,16 @@ class IRflow(AdaptFlow):
                 "dp_setting": [(None, "dp_setting")],
                 "wannier_centroid": [(DipoleSteps, "wannier_centroid"), (None, "train_label")],
             },
+            MDSteps: {
+                "global": [(None, "global")],
+                "init_conf_fmt": [(None, "init_conf_fmt")],
+                "init_conf": [(None, "init_conf")],
+                "dp_model": [(None, "dp_model")],
+            },
             PredictSteps: {
                 "dp_setting": [(None, "dp_setting")],
-                "sampled_system": [(None, "sampled_system")],
-                "sys_fmt": [(None, "sys_fmt")],
+                "sampled_system": [(MDSteps, "sampled_system"), (None, "sampled_system")],
+                "sys_fmt": [(MDSteps, "sys_fmt"), (None, "sys_fmt")],
                 "dwann_model": [(TrainDwannSteps, "dwann_model"), (None, "dwann_model")],
                 "cal_dipole_python": [(None, "cal_dipole_python")],
             },
@@ -78,6 +84,7 @@ class IRflow(AdaptFlow):
         build_dict = {
             DipoleSteps: self.build_dipole_temp,
             TrainDwannSteps: self.build_train_temp,
+            MDSteps: self.build_md_temp,
             PredictSteps: self.build_predict_temp,
             IRsteps: self.build_ir_temp,
         }
@@ -86,7 +93,10 @@ class IRflow(AdaptFlow):
     def to_run_list(self, run_config: dict):
         name_list = ["dipole", "train", "predict", "cal_ir"]
         name_dict = {name_list[i]: i for i in range(4)}
-        return [self.steps_list[i] for i in range(name_dict[run_config["start_steps"]], name_dict[run_config["end_steps"]] + 1)]
+        run_list = [self.steps_list[i] for i in range(name_dict[run_config["start_steps"]], name_dict[run_config["end_steps"]] + 1)]
+        if not run_config.get("provide_sample", False):
+            run_list += [MDSteps]
+        return run_list
     
     def build_dipole_temp(self):
         if self.run_config["dft_type"] == "qe":
@@ -122,6 +132,13 @@ class IRflow(AdaptFlow):
         return TrainDwannSteps(
             "train-dwann",
             self.executors["train"],
+            self.upload_python_packages
+        )
+    
+    def build_md_temp(self):
+        return MDSteps(
+            "MD",
+            self.executors["deepmd_lammps"],
             self.upload_python_packages
         )
     
@@ -165,7 +182,7 @@ if __name__ == "__main__":
             "start_steps": "dipole", 
             "end_steps": "cal_ir", 
             "dft_type": "qe",
-            "provide_sample": False
+            "provide_sample": True
         },
         executors = {
             "base": ex,
@@ -175,4 +192,4 @@ if __name__ == "__main__":
             "predict": ex,
             "deepmd_lammps": ex,
         }
-        )
+    )

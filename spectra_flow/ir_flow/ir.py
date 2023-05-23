@@ -31,7 +31,7 @@ from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 from spectra_flow.post.wannier_centroid_op import CalWC
 from spectra_flow.ir_flow.dipole_steps import DipoleSteps
 from spectra_flow.dp.dp_train import DWannTrain
-from spectra_flow.sample.deepmd_lmp_op import DpLmpSample
+from spectra_flow.MD.deepmd_lmp_op import DpLmpSample
 from spectra_flow.ir_flow.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_op import CalIR
 from spectra_flow.utils import (
@@ -441,7 +441,7 @@ class IRflow(Steps):
         }
         _output_artifacts_temp = {
             "dipole": ["wannier_centroid"],
-            "train": ["dwann_model"],
+            "train": ["dwann_model", "lcurve"],
             "predict": ["total_dipole"],
             "cal_ir": ["ir"]
         }
@@ -578,6 +578,7 @@ class IRflow(Steps):
         if self.run_config["end_steps"] == "train":
             self.add(self.train_dwann)
             self.outputs.artifacts["dwann_model"]._from = out["dwann_model"]
+            self.outputs.artifacts["lcurve"]._from = self.train_dwann.outputs.artifacts["lcurve"]
         print("build train")
         return out, self.train_dwann
     
