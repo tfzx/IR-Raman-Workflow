@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 from dflow import (
     Step,
     Steps,
@@ -61,6 +61,7 @@ class AdaptFlow(Steps, abc.ABC):
         print("\n------------- Init AdaptFlow --------------\n")
         print("All steps:", [s.__name__ for s in run_list])
         self.debug = debug
+        assert run_list, "Error: Empty run list!"
         total_io = self.get_total_io(run_list)
         steps_inputs_parameters, steps_inputs_artifacts, steps_l = self.prebuild(total_io)
         self.all_step: Dict[BasicSteps, Step] = {}
@@ -83,22 +84,28 @@ class AdaptFlow(Steps, abc.ABC):
         print("\n--------------- Build Steps ---------------\n")
         self.templates = self.build_templates(run_list)
         for step_l in steps_l:
-            print(f"build {[s.__name__ for s in step_l]}")
+            print(f"build {self.show_class_list(step_l)}")
         self.build(steps_inputs_parameters, steps_inputs_artifacts, steps_l)
         self.set_outputs(steps_l)
     
     def get_total_io(self, run_list: List[BasicSteps] = steps_list) -> Dict[BasicSteps, Dict[str, Tuple[BasicSteps, str]]]:
         io_dict = self.get_io_dict()
         total_io = {steps: {} for steps in run_list}
-        pre_set = set(run_list + [None])
+        pre_set = set(run_list)
         for steps in run_list:
             for in_key in self.inputs_dict[steps]:
+                key_from_none = None
                 for pre_steps, out_key in io_dict[steps][in_key]:
                     if pre_steps in pre_set:
                         total_io[steps][in_key] = (pre_steps, out_key)
                         break
+                    elif pre_steps is None and key_from_none is None:
+                        key_from_none = out_key
                 else:
-                    raise RuntimeError(f"Cannot build Super OP {self}! Steps {steps} miss one input '{in_key}'!")
+                    if key_from_none:
+                        total_io[steps][in_key] = (None, key_from_none)
+                    else:
+                        raise RuntimeError(f"Cannot build Super OP {self}! Steps {steps} miss one input '{in_key}'!")
         return total_io
     
     def prebuild(self, total_io: Dict[BasicSteps, Dict[str, Tuple[BasicSteps, str]]]):
@@ -136,7 +143,16 @@ class AdaptFlow(Steps, abc.ABC):
 
         self._input_parameters = input_parameters
         self._input_artifacts = input_artifacts
-
+        
+        if self.debug:
+            # Check components
+            regen_run = []
+            if len(regen_run) > 1:
+                print("********************************************************")
+                print(f"[WARNING]: run list can be separated into {len(regen_run)} part:")
+                for component in regen_run:
+                    print(self.show_class_list(component))
+                print("********************************************************")
         steps_l: List[List[BasicSteps]] = []
         mask = np.ones((num_steps, ), dtype = bool)
         while mask.any():
@@ -175,13 +191,16 @@ class AdaptFlow(Steps, abc.ABC):
     def get_outputs(self, steps_l: List[List[BasicSteps]]):
         output_parameters: Dict[str, OutputParameter] = {}
         output_artifacts: Dict[str, OutputArtifact] = {}
-        for steps in steps_l[-1]:
-            p, a = steps.get_outputs()
-            output_parameters.update(p)
-            output_artifacts.update(a)
+        if steps_l:
+            for steps in steps_l[-1]:
+                p, a = steps.get_outputs()
+                output_parameters.update(p)
+                output_artifacts.update(a)
         return output_parameters, output_artifacts
 
     def set_outputs(self, steps_l: List[List[BasicSteps]]):
+        if not steps_l:
+            return
         for steps in steps_l[-1]:
             p, a = steps.get_outputs()
             s = self.all_step[steps]
@@ -237,6 +256,63 @@ class AdaptFlow(Steps, abc.ABC):
         return self._inputs_type
     
     @classmethod
+    def get_run_list(cls, given_inputs: Iterable[str]):
+        steps_list = cls.steps_list
+        given_inputs = set(given_inputs)
+        num_steps = len(steps_list)
+        steps_dict = {steps_list[i]: i for i in range(num_steps)}
+        inputs_dict = cls.get_substeps_inputs()
+        io_dict = cls.get_io_dict()
+        inc_mat = np.zeros((num_steps, num_steps), dtype = bool)
+        for steps in steps_list:
+            for in_key in inputs_dict[steps]:
+                for pre_steps, _ in io_dict[steps][in_key]:
+                    if pre_steps is not None:
+                        inc_mat[steps_dict[steps], steps_dict[pre_steps]] = True
+        
+        sorted_steps_ll: List[List[BasicSteps]] = []
+        mask = np.ones((num_steps, ), dtype = bool)
+        while mask.any():
+            new_mask = np.sum(inc_mat[:, mask], axis = -1) > 0
+            if (new_mask == mask).all():
+                raise RuntimeError("There are loops in io map!!!")
+            sorted_steps_ll.append([steps_list[i] for i in np.nonzero(mask & (~new_mask))[0]])
+            mask = new_mask
+        sorted_steps_list = sum(sorted_steps_ll, [])
+
+        run_list = []
+        pre_mat = np.zeros((num_steps, num_steps), dtype = bool)
+
+        for steps in sorted_steps_list:
+            for in_key in inputs_dict[steps]:
+                pre_run = None
+                for pre_steps, out_key in io_dict[steps][in_key]:
+                    if pre_steps is None and out_key in given_inputs:   # if can be read from given_inputs
+                        break                                           # break to check the next in_key
+                    elif pre_steps in run_list and pre_run is None:     # store the first pre_steps that is in run_list
+                        pre_run = pre_steps
+                else:                                                   # if cannot be read from given_inputs
+                    if pre_run is not None:                             # if can be read from pre_steps that is in run_list
+                        pre_mat[steps_dict[steps], steps_dict[pre_run]] = True  # mark the pre_steps and check next
+                    else:                                               # else
+                        # pre_mat[steps_dict[steps]] = False
+                        break                                           # this steps cannot join to run_list
+            else:                                                       # if all check pass
+                run_list.append(steps)                                  # add steps to run_list
+
+        # pre_mat |= pre_mat.T
+        components: Dict[BasicSteps, List[BasicSteps]] = {}
+        for end_steps in run_list:
+            mask.fill(False)
+            mask[steps_dict[end_steps]] = True
+            new_mask = mask
+            while new_mask.any():
+                new_mask = (np.sum(pre_mat[new_mask, :], axis = 0) > 0) & (~mask)
+                mask |= new_mask
+            components[end_steps] = [steps_list[i] for i in np.nonzero(mask)[0]]
+        return components
+
+    @classmethod
     @abc.abstractmethod
     def get_io_dict(cls) -> Dict[BasicSteps, Dict[str, List[Tuple[BasicSteps, str]]]]:
         """
@@ -264,6 +340,9 @@ class AdaptFlow(Steps, abc.ABC):
         print(steps.__name__)
         print(parameters)
         print(artifacts)
+    
+    def show_class_list(self, cls_l):
+        return [c.__name__ for c in cls_l]
 
 
 
@@ -344,15 +423,25 @@ if __name__ == "__main__":
         @classmethod
         def get_io_dict(cls) -> Dict[BasicSteps, Dict[str, List[Tuple[BasicSteps, str]]]]:
             io_dict = super().get_io_dict()
-            io_dict[B]["B.1"].insert(1, (A, "A.5"))
-            io_dict[B]["B.2"].insert(1, (A, "A.6"))
-            io_dict[C]["C.1"].insert(0, (A, "A.6"))
-            io_dict[C]["C.3"].insert(0, (A, "A.7"))
-            io_dict[C]["C.1"].insert(0, (B, "B.5"))
-            io_dict[C]["C.3"].insert(0, (B, "B.8"))
+            io_dict[B]["B.1"] += [(A, "A.5")]
+            io_dict[B]["B.2"] += [(A, "A.6")]
+            io_dict[C]["C.1"] += [(A, "A.6"), (B, "B.5")]
+            io_dict[C]["C.3"] += [(A, "A.7"), (B, "B.8")]
             return io_dict
         
         def build_templates(self, run_list: List[BasicSteps]) -> Dict[BasicSteps, Steps]:
             return super().build_templates(run_list)
-    
-    flow = ABflow("ab", [A, B, C], debug = True)
+    run_list = ABflow.get_run_list([
+        "A.1", "A.2", "A.3", "A.4", 
+        # "B.1", 
+        # "B.2", 
+        "B.3", 
+        "B.4", 
+        "C.2", 
+        "C.4"])
+    print(run_list.items())
+    for s in [C, B, A]:
+        if s in run_list:
+            run_list = run_list[s]
+            break
+    flow = ABflow("ab", run_list, debug = True)
