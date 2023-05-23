@@ -35,7 +35,8 @@ class DPTrain(OP, abc.ABC):
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "frozen_model": Artifact(Path)
+            "frozen_model": Artifact(Path),
+            "lcurve": Artifact(Path)
         })
 
     @OP.exec_sign_check
@@ -49,16 +50,19 @@ class DPTrain(OP, abc.ABC):
         train_inputs: dict = dp_setting["train_inputs"]
         label = self.preprocess(label, dp_setting)
         train_dir = self.prepare_train(train_inputs, confs, label)
-        model = self.run_train(train_dir)
+        model, lcurve = self.run_train(train_dir)
+        model.symlink_to(train_dir / model)
+        lcurve.symlink_to(train_dir / lcurve)
         return OPIO({
-            "frozen_model": model
+            "frozen_model": model,
+            "lcurve": lcurve
         })
 
     @abc.abstractmethod
     def preprocess(self, label: np.ndarray, dp_setting: dict) -> np.ndarray:
         return label
 
-    def prepare_train(self, train_inputs: Dict, confs: dpdata.System, label: np.ndarray, set_size: int = 5000):
+    def prepare_train(self, train_inputs: Dict[str, dict], confs: dpdata.System, label: np.ndarray, set_size: int = 5000):
         data_dir = Path("data")
         train_dir = Path("train")
         data_dir.mkdir()
@@ -77,6 +81,7 @@ class DPTrain(OP, abc.ABC):
             "systems": [str(data_dir.absolute())],
             "set_prefix": "set"
         })
+        self.lcurve_name = train_inputs["training"].setdefault("disp_file", "lcurve.out")
         with open(train_dir / Path("input.json"), "w+") as f:
             json.dump(train_inputs, fp = f)
         return train_dir
@@ -85,8 +90,9 @@ class DPTrain(OP, abc.ABC):
         with set_directory(train_dir):
             run_command("export OMP_NUM_THREADS=20 && dp train input.json", try_bash = True, print_oe = True)
             run_command(f"dp freeze -o {self.dp_type}.pb", try_bash = True, print_oe = True)
-            model = Path(f"{self.dp_type}.pb").absolute()
-        return model
+            model = Path(f"{self.dp_type}.pb")
+            lcurve = Path(self.lcurve_name)
+        return model, lcurve
 
 class DWannTrain(DPTrain):
     def __init__(self) -> None:
