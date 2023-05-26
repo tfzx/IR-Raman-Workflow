@@ -1,3 +1,4 @@
+from copy import copy
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 from dflow import (
     Step,
@@ -54,22 +55,28 @@ class BasicSteps(Steps, abc.ABC):
     def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
         pass
 
+StepKeyPair = Tuple[Union[str, None], str]
 
-class AdaptFlow(Steps, abc.ABC):
-    steps_list: List[BasicSteps] = []
-    def __init__(self, name: str, run_list: List[BasicSteps], debug: bool = False) -> None:
-        print("\n------------- Init AdaptFlow --------------\n")
-        print("All steps:", [s.__name__ for s in run_list])
+class AdaptiveFlow(Steps, abc.ABC):
+    all_steps: Dict[str, BasicSteps] = []
+    steps_list: List[str] = []
+    parallel_steps: List[List[str]] = []
+    def __init__(self, name: str, run_list: Iterable[str], with_parallel: bool = True, debug: bool = False) -> None:
+        print(f"\n------------- Init {self.__class__.__name__} --------------\n")
+        print("All running steps:", list(run_list))
+        self.with_parallel = with_parallel
         self.debug = debug
-        assert run_list, "Error: Empty run list!"
-        total_io = self.get_total_io(run_list)
-        steps_inputs_parameters, steps_inputs_artifacts, steps_l = self.prebuild(total_io)
-        self.all_step: Dict[BasicSteps, Step] = {}
-        print("\n----------- Init Inputs/Outputs -----------\n")
-        print("Input parameters:", list(self._input_parameters.keys()))
-        print("Input artifacts:", list(self._input_artifacts.keys()))
-        print("Output parameters:", list(self._output_parameters.keys()))
-        print("Output artifacts:", list(self._output_artifacts.keys()))
+        run_list = list(set(run_list))
+        assert len(run_list) > 0, "Error: Empty run list!"
+        steps_inputs_parameters, steps_inputs_artifacts, step_ll = self.prebuild(run_list)
+        self.added_step: Dict[str, Step] = {}
+        if debug:
+            print("\n----------- Init Inputs/Outputs -----------\n")
+            print("Input parameters:", list(self._input_parameters.keys()))
+            print("Input artifacts:", list(self._input_artifacts.keys()))
+            print("Optional Inputs:", [key for key, _inputs in self._input_artifacts.items() if _inputs.optional])
+            print("Output parameters:", list(self._output_parameters.keys()))
+            print("Output artifacts:", list(self._output_artifacts.keys()))
         super().__init__(
             name = name,
             inputs = Inputs(
@@ -83,136 +90,171 @@ class AdaptFlow(Steps, abc.ABC):
         )
         print("\n--------------- Build Steps ---------------\n")
         self.templates = self.build_templates(run_list)
-        for step_l in steps_l:
-            print(f"build {self.show_class_list(step_l)}")
-        self.build(steps_inputs_parameters, steps_inputs_artifacts, steps_l)
-        self.set_outputs(steps_l)
+        self.build(steps_inputs_parameters, steps_inputs_artifacts, step_ll)
+        self.set_outputs(step_ll)
     
-    def get_total_io(self, run_list: List[BasicSteps] = steps_list) -> Dict[BasicSteps, Dict[str, Tuple[BasicSteps, str]]]:
+    def get_inputs_list(self):
+        return list(self._input_parameters.keys()), list(self._input_artifacts.keys())
+
+    def cal_total_io(self, run_list: Iterable[str]):
         io_dict = self.get_io_dict()
-        total_io = {steps: {} for steps in run_list}
-        pre_set = set(run_list)
-        for steps in run_list:
+        all_steps = self.all_steps
+        total_io: Dict[str, Dict[str, StepKeyPair]] = {steps: {} for steps in run_list}
+        run_set = set(run_list)
+        for step_name in run_list:
+            steps = all_steps[step_name]
             for in_key in self.inputs_dict[steps]:
                 key_from_none = None
-                for pre_steps, out_key in io_dict[steps][in_key]:
-                    if pre_steps in pre_set:
-                        total_io[steps][in_key] = (pre_steps, out_key)
+                for pre_step_name, out_key in io_dict[step_name][in_key]:
+                    if pre_step_name in run_set:
+                        total_io[step_name][in_key] = (pre_step_name, out_key)
                         break
-                    elif pre_steps is None and key_from_none is None:
+                    elif pre_step_name is None and key_from_none is None:
                         key_from_none = out_key
                 else:
-                    if key_from_none:
-                        total_io[steps][in_key] = (None, key_from_none)
+                    if key_from_none is not None:
+                        total_io[step_name][in_key] = (None, key_from_none)
                     else:
-                        raise RuntimeError(f"Cannot build Super OP {self}! Steps {steps} miss one input '{in_key}'!")
+                        raise AssertionError(
+                            f"Cannot build Super OP {self.__class__.__name__}! \
+                              Step {step_name}({steps.__class__.__name__}) miss one input '{in_key}'!"
+                        )
         return total_io
     
-    def prebuild(self, total_io: Dict[BasicSteps, Dict[str, Tuple[BasicSteps, str]]]):
-        run_list = list(total_io.keys())
-        num_steps = len(run_list)
-        run_dict = {run_list[i]: i for i in range(num_steps)}
+    def prebuild(self, run_list: List[str] = steps_list, total_io: Dict[str, Dict[str, StepKeyPair]] = None):
+        if total_io is not None:
+            run_list = list(total_io.keys())
+        else:
+            total_io = self.cal_total_io(run_list)
+        all_steps = self.all_steps
         inputs_type = self.inputs_type
         inputs_dict = self.inputs_dict
 
-        inc_mat = np.zeros((num_steps, num_steps), dtype = bool)
-        steps_inputs_parameters = {}
-        steps_inputs_artifacts = {}
-        input_parameters = {}
-        input_artifacts = {}
+        steps_inputs_parameters: Dict[str, Dict[str, StepKeyPair]] = {step_name: {} for step_name in run_list}
+        steps_inputs_artifacts: Dict[str, Dict[str, StepKeyPair]] = {step_name: {} for step_name in run_list}
+        input_parameters: Dict[str, InputParameter] = {}
+        input_artifacts: Dict[str, InputArtifact] = {}
 
-        for steps in run_list:
-            steps_inputs_parameters[steps] = {}
-            steps_inputs_artifacts[steps] = {}
-            for in_key, (pre_steps, out_key) in total_io[steps].items():
+        for step_name in run_list:
+            steps = all_steps[step_name]
+            for in_key, (pre_steps_name, out_key) in total_io[step_name].items():
                 if in_key in inputs_type[steps]["parameters"]:
-                    steps_inputs_parameters[steps][in_key] = (pre_steps, out_key)
-                    is_para = True
-                elif in_key in inputs_type[steps]["artifacts"]:
-                    steps_inputs_artifacts[steps][in_key] = (pre_steps, out_key)
-                    is_para = False
-                else:
-                    raise RuntimeError(f"Steps {steps} has no inputs named '{in_key}'!")
-                if pre_steps is None:
-                    if is_para:
+                    steps_inputs_parameters[step_name][in_key] = (pre_steps_name, out_key)
+                    if pre_steps_name is None:
                         input_parameters[out_key] = inputs_dict[steps][in_key]
-                    else:
+                elif in_key in inputs_type[steps]["artifacts"]:
+                    steps_inputs_artifacts[step_name][in_key] = (pre_steps_name, out_key)
+                    if pre_steps_name is None:
                         input_artifacts[out_key] = inputs_dict[steps][in_key]
                 else:
-                    inc_mat[run_dict[steps], run_dict[pre_steps]] = True
+                    raise AssertionError(f"Step {step_name}({steps.__class__.__name__}) has no inputs named '{in_key}'!")
 
         self._input_parameters = input_parameters
         self._input_artifacts = input_artifacts
         
         if self.debug:
             # Check components
-            regen_run = []
-            if len(regen_run) > 1:
+            components = self.cal_components(total_io, run_list)
+            if len(components) > 1:
                 print("********************************************************")
-                print(f"[WARNING]: run list can be separated into {len(regen_run)} part:")
-                for component in regen_run:
-                    print(self.show_class_list(component))
+                print(f"[WARNING]: run list can be separated into {len(components)} part: \n{components}")
                 print("********************************************************")
-        steps_l: List[List[BasicSteps]] = []
+        if len(self.parallel_steps) > 0:
+            step_ll = self.level_paralell(run_list)
+        else:
+            step_ll = self.default_parallel(total_io, run_list)
+        if not self.with_parallel:
+            step_ll = [[s] for s in sum(step_ll, [])]
+        self._output_parameters, self._output_artifacts = self.get_outputs(step_ll)
+        
+        return steps_inputs_parameters, steps_inputs_artifacts, step_ll
+    
+    def level_paralell(self, run_list: List[str]):
+        run_set = set(run_list)
+        step_ll = [
+            [step_name for step_name in step_l if step_name in run_set] for step_l in self.parallel_steps
+        ]
+        i = 0
+        while i < len(step_ll):
+            if len(step_ll[i]) == 0:
+                del step_ll[i]
+            else:
+                i += 1
+        return step_ll
+
+    def default_parallel(self, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: List[str] = None):
+        if run_list is None:
+            run_list = list(total_io.keys())
+        num_steps = len(run_list)
+        inc_mat = self.cal_inc_mat(total_io, run_list)
+
+        step_ll: List[List[str]] = []
         mask = np.ones((num_steps, ), dtype = bool)
         while mask.any():
             new_mask = np.sum(inc_mat[:, mask], axis = -1) > 0
             if (new_mask == mask).all():
                 raise RuntimeError("There are loops in io map!!!")
-            steps_l.append([run_list[i] for i in np.nonzero(mask & (~new_mask))[0]])
+            step_ll.append([run_list[i] for i in np.nonzero(mask & (~new_mask))[0]])
             mask = new_mask
-        
-        self._output_parameters, self._output_artifacts = self.get_outputs(steps_l)
-        
-        return steps_inputs_parameters, steps_inputs_artifacts, steps_l
-    
-    def build(self, steps_inputs_parameters, steps_inputs_artifacts, steps_l: List[List[BasicSteps]]):
-        for step_l in steps_l:
-            builded_step: List[Step] = []
+        return step_ll
+
+    def build(self, 
+              steps_inputs_parameters: Dict[str, Dict[str, StepKeyPair]], 
+              steps_inputs_artifacts: Dict[str, Dict[str, StepKeyPair]], 
+              step_ll: List[List[str]]
+        ):
+        print_head = "\n" if self.debug else ""
+        for step_l in step_ll:
+            builded_step_l: List[Step] = []
+            print(print_head + f"build {step_l}")
             for s in step_l:
                 p = {}
                 a = {}
-                for in_key, (pre_steps, out_key) in steps_inputs_parameters[s].items():
-                    if pre_steps is None:
+                for in_key, (pre_steps_name, out_key) in steps_inputs_parameters[s].items():
+                    if pre_steps_name is None:
                         p[in_key] = self.inputs.parameters[out_key]
                     else:
-                        p[in_key] = self.all_step[pre_steps].outputs.parameters[out_key]
-                for in_key, (pre_steps, out_key) in steps_inputs_artifacts[s].items():
-                    if pre_steps is None:
+                        p[in_key] = self.added_step[pre_steps_name].outputs.parameters[out_key]
+                for in_key, (pre_steps_name, out_key) in steps_inputs_artifacts[s].items():
+                    if pre_steps_name is None:
                         a[in_key] = self.inputs.artifacts[out_key]
                     else:
-                        a[in_key] = self.all_step[pre_steps].outputs.artifacts[out_key]
-                builded_step.append(self.build_steps(s, p, a))
+                        a[in_key] = self.added_step[pre_steps_name].outputs.artifacts[out_key]
+                step = self.build_step(s, p, a)
+                builded_step_l.append(step)
                 if self.debug:
                     self.show_step(s, p, a)
-                self.all_step[s] = builded_step[-1]
-            self.add(builded_step)
+                self.added_step[s] = step
+            if len(builded_step_l) == 1:
+                self.add(builded_step_l[0])
+            else:
+                self.add(builded_step_l)
 
-    def get_outputs(self, steps_l: List[List[BasicSteps]]):
+    def get_outputs(self, step_l: List[List[str]]):
         output_parameters: Dict[str, OutputParameter] = {}
         output_artifacts: Dict[str, OutputArtifact] = {}
-        if steps_l:
-            for steps in steps_l[-1]:
-                p, a = steps.get_outputs()
+        if len(step_l) > 0:
+            for step_name in step_l[-1]:
+                p, a = self.all_steps[step_name].get_outputs()
                 output_parameters.update(p)
                 output_artifacts.update(a)
         return output_parameters, output_artifacts
 
-    def set_outputs(self, steps_l: List[List[BasicSteps]]):
-        if not steps_l:
+    def set_outputs(self, step_l: List[List[str]]):
+        if len(step_l) == 0:
             return
-        for steps in steps_l[-1]:
-            p, a = steps.get_outputs()
-            s = self.all_step[steps]
+        for step_name in step_l[-1]:
+            p, a = self.all_steps[step_name].get_outputs()
+            s = self.added_step[step_name]
             for key in p:
-                self.outputs.parameters[key] = s.outputs.parameters[key]
+                self.outputs.parameters[key].value_from_parameter = s.outputs.parameters[key]
             for key in a:
                 self.outputs.artifacts[key]._from = s.outputs.artifacts[key]
 
     @classmethod
     def get_substeps_inputs(cls):
         inputs_dict: Dict[BasicSteps, Dict[str, Union[InputParameter, InputArtifact]]] = {}
-        for steps in cls.steps_list:
+        for steps in set(cls.all_steps.values()):
             p, a = steps.get_inputs()
             p.update(a)
             inputs_dict[steps] = p
@@ -227,7 +269,7 @@ class AdaptFlow(Steps, abc.ABC):
     @classmethod
     def get_substeps_outputs(cls):
         outputs_dict: Dict[BasicSteps, Dict[str, Union[OutputParameter, OutputArtifact]]] = {}
-        for steps in cls.steps_list:
+        for steps in set(cls.all_steps.values()):
             p, a = steps.get_outputs()
             p.update(a)
             outputs_dict[steps] = p
@@ -242,7 +284,7 @@ class AdaptFlow(Steps, abc.ABC):
     @classmethod
     def get_inputs_type(cls) -> Dict[BasicSteps, Dict[str, List[str]]]:
         inputs_type = {}
-        for steps in cls.steps_list:
+        for steps in set(cls.all_steps.values()):
             inputs_type[steps] = {}
             p, a = steps.get_inputs()
             inputs_type[steps]["parameters"] = list(p.keys())
@@ -256,21 +298,111 @@ class AdaptFlow(Steps, abc.ABC):
         return self._inputs_type
     
     @classmethod
-    def get_run_list(cls, given_inputs: Iterable[str]):
+    def run_from_inputs(cls, given_inputs: Iterable[str]):
         steps_list = cls.steps_list
+        all_steps = cls.all_steps
+        inputs_dict = cls.get_substeps_inputs()
+        io_dict = cls.get_io_dict()
         given_inputs = set(given_inputs)
         num_steps = len(steps_list)
         steps_dict = {steps_list[i]: i for i in range(num_steps)}
+        
+        run_list: List[str] = []
+        pre_mat = np.zeros((num_steps, num_steps), dtype = bool)
+
+        for step_name in steps_list:
+            for in_key, _inputs in inputs_dict[all_steps[step_name]].items():
+                pre_run = None
+                for pre_step_name, out_key in io_dict[step_name][in_key]:
+                    if pre_step_name is None and (                          # if
+                        (isinstance(_inputs, InputArtifact) and _inputs.optional)   # in_key is optional
+                        or out_key in given_inputs                      # or can be read from given_inputs
+                    ):                                                  # then
+                        break                                           # break to check the next in_key
+                    elif pre_step_name in run_list and pre_run is None:     # store the first pre_steps that is in run_list
+                        pre_run = pre_step_name
+                else:                                                   # if cannot be read from given_inputs
+                    if pre_run is not None:                             # if can be read from pre_steps that is in run_list
+                        pre_mat[steps_dict[step_name], steps_dict[pre_run]] = True  # mark the pre_steps and check next
+                    else:                                               # else
+                        pre_mat[steps_dict[step_name]] = False
+                        break                                           # this steps cannot join to run_list
+            else:                                                       # if all check pass
+                run_list.append(step_name)                              # add steps to run_list
+
+        mask = np.ones((num_steps, ), dtype = bool)
+        parents: Dict[str, List[str]] = {}
+        for end_step_name in run_list:
+            mask.fill(False)
+            mask[steps_dict[end_step_name]] = True
+            new_mask = mask
+            while new_mask.any():
+                new_mask = (np.sum(pre_mat[new_mask, :], axis = 0) > 0) & (~mask)
+                mask |= new_mask
+            parents[end_step_name] = [steps_list[i] for i in np.nonzero(mask)[0]]
+        return parents
+
+    @classmethod
+    @abc.abstractmethod
+    def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
+        """
+            The default implementation is trivial.
+            return: Dict[steps_name, Dict[in_key, List[StepKeyPair]]], where StepKeyPair = [pre_steps_name, out_key]
+        """
+        io_dict = {}
+        inputs_dict = cls.get_substeps_inputs()
+        for step_name, steps in cls.all_steps.items():
+            io_dict[step_name] = {key: [(None, key)] for key in inputs_dict[steps]}
+        return io_dict
+
+    def build_step(self, step_name: str, parameters: dict, artifacts: dict) -> Step:
+        return Step(
+            "-".join([step_name.upper().replace("_", "-").replace(".", "-"), self.all_steps[step_name].__name__]),
+            self.templates[step_name],
+            parameters = parameters,
+            artifacts = artifacts
+        )
+    
+    @abc.abstractmethod
+    def build_templates(self, run_list: List[str]) -> Dict[str, Steps]:
+        return {step_name: self.all_steps[step_name]() for step_name in run_list}
+    
+    def show_step(self, step_name: str, parameters: dict, artifacts: dict):
+        print(f"\n{step_name} ({self.all_steps[step_name].__name__})")
+        print(parameters)
+        print(artifacts)
+    
+    @classmethod
+    def check_steps_list(cls):
+        pre_set = set([None])
         inputs_dict = cls.get_substeps_inputs()
         io_dict = cls.get_io_dict()
-        inc_mat = np.zeros((num_steps, num_steps), dtype = bool)
-        for steps in steps_list:
+        for step_name in cls.steps_list:
+            steps = cls.all_steps[step_name]
             for in_key in inputs_dict[steps]:
-                for pre_steps, _ in io_dict[steps][in_key]:
+                for pre_steps, _ in io_dict[step_name][in_key]:
+                    if pre_steps not in pre_set:
+                        sorted_steps = cls.sort_steps_list()
+                        raise AssertionError(
+                            f"The order of steps_list is not consistent with io map! Maybe {sorted_steps} ?"
+                        )
+            pre_set.add(step_name)
+
+    @classmethod
+    def sort_steps_list(cls):
+        steps_list = cls.steps_list
+        num_steps = len(steps_list)
+        steps_dict = {steps_list[i]: i for i in range(num_steps)}
+        inc_mat = np.zeros((num_steps, num_steps), dtype = bool)
+        inputs_dict = cls.get_substeps_inputs()
+        io_dict = cls.get_io_dict()
+        for step_name in steps_list:
+            for in_key in inputs_dict[cls.all_steps[step_name]]:
+                for pre_steps, _ in io_dict[step_name][in_key]:
                     if pre_steps is not None:
-                        inc_mat[steps_dict[steps], steps_dict[pre_steps]] = True
+                        inc_mat[steps_dict[step_name], steps_dict[pre_steps]] = True
         
-        sorted_steps_ll: List[List[BasicSteps]] = []
+        sorted_steps_ll: List[List[str]] = []
         mask = np.ones((num_steps, ), dtype = bool)
         while mask.any():
             new_mask = np.sum(inc_mat[:, mask], axis = -1) > 0
@@ -278,73 +410,42 @@ class AdaptFlow(Steps, abc.ABC):
                 raise RuntimeError("There are loops in io map!!!")
             sorted_steps_ll.append([steps_list[i] for i in np.nonzero(mask & (~new_mask))[0]])
             mask = new_mask
-        sorted_steps_list = sum(sorted_steps_ll, [])
-
-        run_list = []
-        pre_mat = np.zeros((num_steps, num_steps), dtype = bool)
-
-        for steps in sorted_steps_list:
-            for in_key in inputs_dict[steps]:
-                pre_run = None
-                for pre_steps, out_key in io_dict[steps][in_key]:
-                    if pre_steps is None and out_key in given_inputs:   # if can be read from given_inputs
-                        break                                           # break to check the next in_key
-                    elif pre_steps in run_list and pre_run is None:     # store the first pre_steps that is in run_list
-                        pre_run = pre_steps
-                else:                                                   # if cannot be read from given_inputs
-                    if pre_run is not None:                             # if can be read from pre_steps that is in run_list
-                        pre_mat[steps_dict[steps], steps_dict[pre_run]] = True  # mark the pre_steps and check next
-                    else:                                               # else
-                        # pre_mat[steps_dict[steps]] = False
-                        break                                           # this steps cannot join to run_list
-            else:                                                       # if all check pass
-                run_list.append(steps)                                  # add steps to run_list
-
-        # pre_mat |= pre_mat.T
-        components: Dict[BasicSteps, List[BasicSteps]] = {}
-        for end_steps in run_list:
-            mask.fill(False)
-            mask[steps_dict[end_steps]] = True
-            new_mask = mask
-            while new_mask.any():
-                new_mask = (np.sum(pre_mat[new_mask, :], axis = 0) > 0) & (~mask)
-                mask |= new_mask
-            components[end_steps] = [steps_list[i] for i in np.nonzero(mask)[0]]
-        return components
+        return sorted_steps_ll
 
     @classmethod
-    @abc.abstractmethod
-    def get_io_dict(cls) -> Dict[BasicSteps, Dict[str, List[Tuple[BasicSteps, str]]]]:
-        """
-            The default implementation is trivial.
-        """
-        io_dict = {}
-        inputs_dict = cls.get_substeps_inputs()
-        for steps, inputs in inputs_dict.items():
-            io_dict[steps] = {key: [(None, key)] for key in inputs}
-        return io_dict
+    def cal_inc_mat(cls, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: List[str]):
+        run_dict = {run_list[i]: i for i in range(len(run_list))}
+        inc_mat = np.zeros((len(run_list), len(run_list)), dtype = bool)
+        for step_name in run_list:
+            for pre_step_name, _ in total_io[step_name].values():
+                if pre_step_name is not None:
+                    inc_mat[run_dict[step_name], run_dict[pre_step_name]] = True
+        return inc_mat
 
-    def build_steps(self, steps: BasicSteps, parameters: dict, artifacts: dict) -> Step:
-        return Step(
-            steps.__name__,
-            self.templates[steps],
-            parameters = parameters,
-            artifacts = artifacts
-        )
-    
-    @abc.abstractmethod
-    def build_templates(self, run_list: List[BasicSteps]) -> Dict[BasicSteps, Steps]:
-        return {steps: steps() for steps in run_list}
-    
-    def show_step(self, steps: BasicSteps, parameters: dict, artifacts: dict):
-        print(steps.__name__)
-        print(parameters)
-        print(artifacts)
-    
-    def show_class_list(self, cls_l):
-        return [c.__name__ for c in cls_l]
+    @classmethod
+    def cal_components(cls, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: List[str] = None):
+        if run_list is None:
+            run_list = list(total_io.keys())
+        num_steps = len(run_list)
+        run_dict = {run_list[i]: i for i in range(num_steps)}
+        inc_mat = cls.cal_inc_mat(total_io, run_list)
+        inc_mat |= inc_mat.T
 
-
+        mask = np.ones((num_steps, ), dtype = bool)
+        components: List[List[str]] = []
+        remained_list = copy(run_list)
+        while remained_list:
+            end_steps = remained_list[-1]
+            mask.fill(False)
+            mask[run_dict[end_steps]] = True
+            new_mask = mask
+            while new_mask.any():
+                new_mask = (np.sum(inc_mat[new_mask, :], axis = 0) > 0) & (~mask)
+                mask |= new_mask
+            components.append([run_list[i] for i in np.nonzero(mask)[0]])
+            for s in components[-1]:
+                remained_list.remove(s)
+        return components
 
 if __name__ == "__main__":
     from spectra_flow.utils import bohrium_login, load_json
@@ -358,7 +459,7 @@ if __name__ == "__main__":
                 "A.2": InputParameter(type = dict, value = {})
             }, {
                 "A.3": InputArtifact(),
-                "A.4": InputArtifact()
+                "A.4": InputArtifact(optional=True)
             }
         
         @classmethod
@@ -415,33 +516,51 @@ if __name__ == "__main__":
                 "C.8": OutputArtifact()
             }
 
-    class ABflow(AdaptFlow):
-        steps_list = [A, B, C]
+    class ABflow(AdaptiveFlow):
+        all_steps = {"a": A, "b": B, "c": C}
+        steps_list = ["a", "b", "c"]
         def __init__(self, name: str, run_list: List[BasicSteps], debug: bool = False) -> None:
             super().__init__(name, run_list, debug = debug)
         
         @classmethod
         def get_io_dict(cls) -> Dict[BasicSteps, Dict[str, List[Tuple[BasicSteps, str]]]]:
             io_dict = super().get_io_dict()
-            io_dict[B]["B.1"] += [(A, "A.5")]
-            io_dict[B]["B.2"] += [(A, "A.6")]
-            io_dict[C]["C.1"] += [(A, "A.6"), (B, "B.5")]
-            io_dict[C]["C.3"] += [(A, "A.7"), (B, "B.8")]
+            io_dict["b"]["B.1"] += [("a", "A.5")]
+            io_dict["b"]["B.2"] += [("a", "A.6")]
+            io_dict["c"]["C.1"] += [ ("b", "B.5")]
+            io_dict["c"]["C.3"] += [ ("b", "B.8")]
             return io_dict
         
         def build_templates(self, run_list: List[BasicSteps]) -> Dict[BasicSteps, Steps]:
             return super().build_templates(run_list)
-    run_list = ABflow.get_run_list([
-        "A.1", "A.2", "A.3", "A.4", 
+    
+    ABflow.check_steps_list()
+    run_list = ABflow.run_from_inputs([
+        "A.1", "A.2", "A.3", 
+        # "A.4", 
         # "B.1", 
         # "B.2", 
         "B.3", 
         "B.4", 
         "C.2", 
         "C.4"])
-    print(run_list.items())
-    for s in [C, B, A]:
+    print(list(run_list.values()))
+    for s in ["c", "b", "a"]:
         if s in run_list:
             run_list = run_list[s]
             break
-    flow = ABflow("ab", run_list, debug = True)
+    flow = ABflow("ab", run_list, debug = False)
+    s = Step(
+        "test",
+        flow,
+        parameters = {
+            "A.1": "",
+            "A.2": "",
+            "C.2": "",
+        },
+        artifacts = {
+            "A.3": "",
+            "C.4": "",
+        }
+    )
+    

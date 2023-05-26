@@ -1,5 +1,5 @@
-from spectra_flow.base_workflow import AdaptFlow, BasicSteps
-from typing import Dict, List, Optional, Tuple, Union
+from spectra_flow.base_workflow import AdaptiveFlow, BasicSteps, StepKeyPair
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 from pathlib import Path
 from dflow import (
     Step,
@@ -29,13 +29,105 @@ from spectra_flow.ir_flow.train_steps import TrainDwannSteps
 from spectra_flow.ir_flow.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_steps import IRsteps
 from spectra_flow.MD.md_steps import MDSteps
+from spectra_flow.utils import (
+    complete_by_default,
+    get_executor
+)
+from spectra_flow.ir_flow.ir import IRchecker, IRinputs
+from spectra_flow.read_par import read_par
 
-class IRflow(AdaptFlow):
-    steps_list = [DipoleSteps, TrainDwannSteps, PredictSteps, IRsteps, MDSteps]
+def prep_par(parameters: Dict[str, dict], run_config: dict):
+    inputs = read_par(parameters)
+    name_dict = {IRflow.main_steps[i]: i for i in range(4)}
+    name_dict["md"] = -1
+    run_tree = IRflow.run_from_inputs(inputs)
+    assert len(run_tree) > 0, "Cannot run any step from the inputs!"
+    if "dipole" in parameters["config"]:
+        run_config["dft_type"] = parameters["config"]["dipole"]["dft_type"]
+    if "start_steps" in run_config:
+        start_i = name_dict[run_config["start_steps"]]
+        if "end_steps" in run_config:
+            end_i = name_dict[run_config["end_steps"]]
+        else:
+            end_i = 0
+            for step_name in run_tree:
+                end_i = max(end_i, name_dict[step_name])
+        if end_i < start_i:
+            raise AssertionError(f"Cannot start at {run_config['start_steps']}")
+        run_list = [IRflow.main_steps[i] for i in range(start_i, end_i + 1)]
+        if not run_config.get("provide_sample", False):
+            run_list += ["md"]
+    else:
+        if "end_steps" in run_config:
+            end_steps = run_config["end_steps"]
+        else:
+            for step_name in reversed(IRflow.main_steps):
+                if step_name in run_tree:
+                    end_steps = step_name
+                    break
+            else:
+                end_steps = "md"
+        run_list = run_tree[end_steps]
+        if run_config.get("provide_sample", False) and "md" in run_list:
+            print("[WARNING] 'provide_sample' in run_config is set to be True, but MD is necessary!")
+    return inputs, run_list
+    
+
+
+def build_ir(
+        parameters: dict, 
+        machine: dict, 
+        run_config: dict = None, 
+        upload_python_packages = None, 
+        with_parallel = True,
+        debug = True
+    ):
+    executors = {}
+    for name, exec_config in machine["executors"].items():
+        executors[name] = get_executor(exec_config)
+    if run_config is None:
+        run_config = {}
+    inputs, run_list = prep_par(parameters, run_config)
+    
+
+    ir_template = IRflow(
+        "IR-Flow", 
+        run_config, 
+        executors, 
+        upload_python_packages, 
+        run_list,
+        with_parallel,
+        debug
+    )
+    in_p, in_a = ir_template.get_inputs_list()
+    input_parameters = {key: inputs[key] for key in in_p if key in inputs}
+    input_artifacts_path = {key: inputs[key] for key in in_a if key in inputs}
+    input_artifacts = {}
+    for name, path in input_artifacts_path.items():
+        input_artifacts[name] = upload_artifact(path)
+    ir_step = Step(
+        "IR-Flow",
+        ir_template,
+        parameters = input_parameters,
+        artifacts = input_artifacts
+    )
+    return ir_step
+
+class IRflow(AdaptiveFlow):
+    all_steps = {
+        "dipole": DipoleSteps, 
+        "train": TrainDwannSteps, 
+        "md": MDSteps, 
+        "predict": PredictSteps, 
+        "cal_ir": IRsteps
+    }
+    steps_list = ["dipole", "train", "md", "predict", "cal_ir"]
+    parallel_steps = [["dipole"], ["train", "md"], ["predict"], ["cal_ir"]]
+    main_steps = ["dipole", "train", "predict", "cal_ir"]
     @classmethod
-    def get_io_dict(cls) -> Dict[BasicSteps, Dict[str, List[Tuple[BasicSteps, str]]]]:
+    def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
         return {
-            DipoleSteps: {
+            "dipole": {
                 "input_setting": [(None, "input_setting")],
                 "task_setting": [(None, "task_setting")],
                 "conf_fmt": [(None, "train_conf_fmt")],
@@ -43,28 +135,28 @@ class IRflow(AdaptFlow):
                 "pseudo": [(None, "pseudo")],
                 "cal_dipole_python": [(None, "cal_dipole_python")],
             },
-            TrainDwannSteps: {
+            "train": {
                 "conf_fmt": [(None, "train_conf_fmt")],
                 "confs": [(None, "train_confs")],
                 "dp_setting": [(None, "dp_setting")],
-                "wannier_centroid": [(DipoleSteps, "wannier_centroid"), (None, "train_label")],
+                "wannier_centroid": [(None, "train_label"), ("dipole", "wannier_centroid")],
             },
-            MDSteps: {
+            "md": {
                 "global": [(None, "global")],
                 "init_conf_fmt": [(None, "init_conf_fmt")],
                 "init_conf": [(None, "init_conf")],
                 "dp_model": [(None, "dp_model")],
             },
-            PredictSteps: {
+            "predict": {
                 "dp_setting": [(None, "dp_setting")],
-                "sampled_system": [(MDSteps, "sampled_system"), (None, "sampled_system")],
-                "sys_fmt": [(MDSteps, "sys_fmt"), (None, "sys_fmt")],
-                "dwann_model": [(TrainDwannSteps, "dwann_model"), (None, "dwann_model")],
+                "sampled_system": [(None, "sampled_system"), ("md", "sampled_system")],
+                "sys_fmt": [(None, "sys_fmt"), ("md", "sys_fmt")],
+                "dwann_model": [(None, "dwann_model"), ("train", "dwann_model")],
                 "cal_dipole_python": [(None, "cal_dipole_python")],
             },
-            IRsteps: {
+            "cal_ir": {
                 "global": [(None, "global")],
-                "total_dipole": [(PredictSteps, "total_dipole"), (None, "total_dipole")],
+                "total_dipole": [("predict", "total_dipole"), (None, "total_dipole")],
             }
         }
 
@@ -73,14 +165,18 @@ class IRflow(AdaptFlow):
             run_config: dict,
             executors: Dict[str, Executor],
             upload_python_packages: List[Union[str, Path]] = None,
-            debug = False
+            run_list: Iterable[str] = None,
+            with_parallel: bool = True,
+            debug: bool = False
         ):
         self.run_config = run_config
         self.executors = executors
         self.upload_python_packages = upload_python_packages
-        super().__init__(name, self.to_run_list(run_config), debug = debug)
+        if run_list is None:
+            run_list = self.to_run_list(run_config)
+        super().__init__(name, run_list, with_parallel, debug)
     
-    def build_templates(self, run_list: List[BasicSteps]) -> Dict[BasicSteps, Steps]:
+    def build_templates(self, run_list: List[str]) -> Dict[str, Steps]:
         build_dict = {
             DipoleSteps: self.build_dipole_temp,
             TrainDwannSteps: self.build_train_temp,
@@ -88,14 +184,13 @@ class IRflow(AdaptFlow):
             PredictSteps: self.build_predict_temp,
             IRsteps: self.build_ir_temp,
         }
-        return {step: build_dict[step]() for step in run_list}
+        return {step_name: build_dict[self.all_steps[step_name]]() for step_name in run_list}
         
     def to_run_list(self, run_config: dict):
-        name_list = ["dipole", "train", "predict", "cal_ir"]
-        name_dict = {name_list[i]: i for i in range(4)}
-        run_list = [self.steps_list[i] for i in range(name_dict[run_config["start_steps"]], name_dict[run_config["end_steps"]] + 1)]
+        name_dict = {self.main_steps[i]: i for i in range(4)}
+        run_list = [self.main_steps[i] for i in range(name_dict[run_config["start_steps"]], name_dict[run_config["end_steps"]] + 1)]
         if not run_config.get("provide_sample", False):
-            run_list += [MDSteps]
+            run_list += ["md"]
         return run_list
     
     def build_dipole_temp(self):
@@ -176,13 +271,14 @@ if __name__ == "__main__":
             },
         },
     )
+    IRflow.check_steps_list()
     flow = IRflow(
         "ir", 
         {
             "start_steps": "dipole", 
             "end_steps": "cal_ir", 
             "dft_type": "qe",
-            "provide_sample": True
+            "provide_sample": False
         },
         executors = {
             "base": ex,
@@ -191,5 +287,6 @@ if __name__ == "__main__":
             "train": ex,
             "predict": ex,
             "deepmd_lammps": ex,
-        }
+        },
+        debug = False
     )
