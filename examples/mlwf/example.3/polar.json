@@ -1,0 +1,5 @@
+{
+    "ef_type": "enthalpy",
+    "central_diff": false,
+    "eps_efield": 0.005
+}
