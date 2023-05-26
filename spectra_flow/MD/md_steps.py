@@ -82,5 +82,5 @@ class MDSteps(BasicSteps):
         self.add(deepmd_lammps)
 
         self.outputs.artifacts["sampled_system"]._from = deepmd_lammps.outputs.artifacts["sampled_system"]
-        self.outputs.parameters["sys_fmt"] = deepmd_lammps.outputs.parameters["sys_fmt"]
+        self.outputs.parameters["sys_fmt"].value_from_parameter = deepmd_lammps.outputs.parameters["sys_fmt"]
         self.outputs.artifacts["lammps_log"]._from = deepmd_lammps.outputs.artifacts["lammps_log"]
