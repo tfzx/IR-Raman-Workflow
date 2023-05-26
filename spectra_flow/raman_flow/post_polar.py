@@ -12,14 +12,14 @@ from dflow.utils import (
     set_directory
 )
 
-class CalPolar(OP):
+class PostPolar(OP):
     def __init__(self) -> None:
         super().__init__()
     
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "input_setting": BigParameter(dict),
+            "polar_setting": BigParameter(dict),
             "wannier_centroid": Artifact(Dict[str, Path]),
         })
 
@@ -34,9 +34,9 @@ class CalPolar(OP):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
-        eps = input_setting["polar_params"]["eps_efield"]
-        c_diff = input_setting["polar_params"]["central_diff"]
+        polar_setting: Dict[str, Union[str, dict]] = op_in["polar_setting"]
+        eps = polar_setting["eps_efield"]
+        c_diff = polar_setting["central_diff"]
         wc_dict: Dict[str, np.ndarray] = {}
         for key, p in op_in["wannier_centroid"].items():
             arr = np.loadtxt(p, dtype = float, ndmin = 2)
@@ -77,11 +77,11 @@ class CalPolar(OP):
         v = next(iter(wc_dict.values()))
         polar = np.zeros((v.shape[0], v.shape[1], 3, 3), dtype = float)
         if c_diff:
-            polar[:, :, 0, :] = (wc_dict["xp"] - wc_dict["xm"]) / (2 * eps)
-            polar[:, :, 1, :] = (wc_dict["yp"] - wc_dict["ym"]) / (2 * eps)
-            polar[:, :, 2, :] = (wc_dict["zp"] - wc_dict["zm"]) / (2 * eps)
+            polar[:, :, 0, :] = (wc_dict["ef_xp"] - wc_dict["ef_xm"]) / (2 * eps)
+            polar[:, :, 1, :] = (wc_dict["ef_yp"] - wc_dict["ef_ym"]) / (2 * eps)
+            polar[:, :, 2, :] = (wc_dict["ef_zp"] - wc_dict["ef_zm"]) / (2 * eps)
         else:
-            polar[:, :, 0, :] = (wc_dict["x"] - wc_dict["ori"]) / eps
-            polar[:, :, 1, :] = (wc_dict["y"] - wc_dict["ori"]) / eps
-            polar[:, :, 2, :] = (wc_dict["z"] - wc_dict["ori"]) / eps
+            polar[:, :, 0, :] = (wc_dict["ef_x"] - wc_dict["ori"]) / eps
+            polar[:, :, 1, :] = (wc_dict["ef_y"] - wc_dict["ori"]) / eps
+            polar[:, :, 2, :] = (wc_dict["ef_z"] - wc_dict["ori"]) / eps
         return polar.reshape(polar.shape[0], -1)

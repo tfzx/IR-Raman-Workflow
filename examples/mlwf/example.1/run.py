@@ -33,7 +33,7 @@ if __name__ == "__main__":
         name = "Dipole",
         mlwf_template = mlwf_template,
         wc_op = CalWC,
-        wc_executor = cal_executor
+        cal_executor = cal_executor
     )
 
     import spectra_flow.post.cal_dipole

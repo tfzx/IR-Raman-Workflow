@@ -19,6 +19,7 @@ from dflow.python import (
 import spectra_flow
 from spectra_flow.base_workflow import BasicSteps
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
+from spectra_flow.post.wannier_centroid_op import CalWC
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
 # from mlwf_op.collect_wfc_op import CollectWFC
@@ -41,7 +42,6 @@ class DipoleSteps(BasicSteps):
     @classmethod
     def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
         return {}, {
-            "backward": OutputArtifact(),
             "wannier_function_centers": OutputArtifact(),
             "wannier_centroid": OutputArtifact()
         }
@@ -50,8 +50,7 @@ class DipoleSteps(BasicSteps):
             self,
             name: str,
             mlwf_template: MLWFSteps,
-            wc_op: OP,
-            wc_executor: Executor,
+            cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]] = None
         ):
         super().__init__(name)
@@ -59,16 +58,14 @@ class DipoleSteps(BasicSteps):
             upload_python_packages = spectra_flow.__path__
         self.build_steps(
             mlwf_template, 
-            wc_op,
-            wc_executor, 
+            cal_executor, 
             upload_python_packages
         )
     
     def build_steps(
             self, 
             mlwf_template: MLWFSteps,
-            wc_op: OP, 
-            wc_executor: Executor,
+            cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]]
         ):
         input_setting = self.inputs.parameters["input_setting"]
@@ -94,7 +91,7 @@ class DipoleSteps(BasicSteps):
         wc_step = Step(
             "cal-wc",
             PythonOPTemplate(
-                wc_op, 
+                CalWC, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages
             ),
@@ -106,9 +103,8 @@ class DipoleSteps(BasicSteps):
                 "cal_dipole_python": cal_dipole_python,
                 "wannier_function_centers": mlwf_step.outputs.artifacts["wannier_function_centers"]
             },
-            executor = wc_executor
+            executor = cal_executor
         )
         self.add(wc_step)
-        self.outputs.artifacts["backward"]._from = mlwf_step.outputs.artifacts["backward"]
         self.outputs.artifacts["wannier_function_centers"]._from = mlwf_step.outputs.artifacts["wannier_function_centers"]
         self.outputs.artifacts["wannier_centroid"]._from = wc_step.outputs.artifacts["wannier_centroid"]
