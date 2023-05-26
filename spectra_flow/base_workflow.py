@@ -357,7 +357,7 @@ class AdaptiveFlow(Steps, abc.ABC):
 
     def build_step(self, step_name: str, parameters: dict, artifacts: dict) -> Step:
         return Step(
-            "-".join([step_name.upper().replace("_", "-").replace(".", "-"), self.all_steps[step_name].__name__]),
+            step_name.upper().replace("_", "-").replace(".", "-"),
             self.templates[step_name],
             parameters = parameters,
             artifacts = artifacts

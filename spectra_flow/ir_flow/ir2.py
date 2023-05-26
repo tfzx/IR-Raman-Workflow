@@ -23,17 +23,14 @@ from spectra_flow.mlwf.qe_cp import (
     CollectCPWF
 )
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
-from spectra_flow.post.wannier_centroid_op import CalWC
 from spectra_flow.ir_flow.dipole_steps import DipoleSteps
 from spectra_flow.ir_flow.train_steps import TrainDwannSteps
 from spectra_flow.ir_flow.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_steps import IRsteps
 from spectra_flow.MD.md_steps import MDSteps
 from spectra_flow.utils import (
-    complete_by_default,
     get_executor
 )
-from spectra_flow.ir_flow.ir import IRchecker, IRinputs
 from spectra_flow.read_par import read_par
 
 def prep_par(parameters: Dict[str, dict], run_config: dict):
@@ -75,6 +72,7 @@ def prep_par(parameters: Dict[str, dict], run_config: dict):
 
 
 def build_ir(
+        name: str,
         parameters: dict, 
         machine: dict, 
         run_config: dict = None, 
@@ -83,8 +81,8 @@ def build_ir(
         debug = True
     ):
     executors = {}
-    for name, exec_config in machine["executors"].items():
-        executors[name] = get_executor(exec_config)
+    for ex_name, exec_config in machine["executors"].items():
+        executors[ex_name] = get_executor(exec_config)
     if run_config is None:
         run_config = {}
     inputs, run_list = prep_par(parameters, run_config)
@@ -103,10 +101,10 @@ def build_ir(
     input_parameters = {key: inputs[key] for key in in_p if key in inputs}
     input_artifacts_path = {key: inputs[key] for key in in_a if key in inputs}
     input_artifacts = {}
-    for name, path in input_artifacts_path.items():
-        input_artifacts[name] = upload_artifact(path)
+    for in_key, path in input_artifacts_path.items():
+        input_artifacts[in_key] = upload_artifact(path)
     ir_step = Step(
-        "IR-Flow",
+        name,
         ir_template,
         parameters = input_parameters,
         artifacts = input_artifacts
@@ -218,7 +216,6 @@ class IRflow(AdaptiveFlow):
         return DipoleSteps(
             "Cal-Dipole",
             mlwf_template,
-            CalWC,
             self.executors["cal"],
             self.upload_python_packages
         )

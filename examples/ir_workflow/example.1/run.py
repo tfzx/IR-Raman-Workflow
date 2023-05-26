@@ -16,7 +16,7 @@ if __name__ == "__main__":
         "start_steps": "predict",
         "end_steps": "cal_ir"
     }
-    ir_step = build_ir(load_json("parameters.json"), load_json("../machine.json"), run_config)
+    ir_step = build_ir("ex1", load_json("parameters.json"), load_json("../machine.json"), run_config)
 
     wf = Workflow("ir-workflow")
     wf.add(ir_step)
@@ -24,7 +24,7 @@ if __name__ == "__main__":
     while wf.query_status() in ["Pending", "Running"]:
         time.sleep(1)
     assert(wf.query_status() == "Succeeded")
-    ir_path = download_artifact(wf.query_step("water")[0].outputs.artifacts["ir"], path = "back")[0]
+    ir_path = download_artifact(wf.query_step("ex1")[0].outputs.artifacts["ir"], path = "back")[0]
     ir = np.loadtxt(ir_path)
     plt.plot(ir[:, 0], ir[:, 1] / 1000, label = r'$D_2O$, calculated', scalex = 1.5, scaley= 2.2)
     plt.xlim((0, 4000.))
