@@ -1,4 +1,4 @@
-from typing import Dict, Optional, Tuple, Union
+from typing import Dict, Optional, Tuple, Union, Callable
 import numpy as np
 from copy import deepcopy
 from tempfile import TemporaryFile
@@ -141,13 +141,40 @@ def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int
     return wan_params, proj, kpoints
 
 class Wannier90Inputs:
-    def __init__(self, wan_params: dict, proj: Optional[dict], kpoints: np.ndarray, confs: dpdata.System) -> None:
-        self.params_str = self.write_parameters(wan_params, kpoints, proj)
-        self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]]
+    def __init__(
+            self, 
+            wan_params: dict, 
+            proj: Optional[Dict[str, str]], 
+            kpoints: np.ndarray, 
+            confs: dpdata.System, 
+            rewrite_atoms: Callable[[dpdata.System], np.ndarray] = None,
+            rewrite_proj: Callable[[dpdata.System], Dict[str, str]] = None
+        ) -> None:
+        self.params_str = self.write_parameters(wan_params)
+        self.kpoints_str = self.write_kpoints(kpoints)
+        if rewrite_proj is not None:
+            self.rewrite_proj = rewrite_proj
+        elif proj:
+            self.proj_str = self.write_proj(proj)
+        else:
+            self.proj_str = ""
+        if rewrite_atoms is None:
+            self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]]
+        else:
+            self.rewrite_atoms = rewrite_atoms
         self.confs = confs
 
     def write(self, frame: int):
-        return "\n".join([self.params_str, self.write_configuration(self.confs[frame], self.atoms)])
+        conf = self.confs[frame]
+        if hasattr(self, "atoms"):
+            atoms = self.atoms
+        else:
+            atoms = self.rewrite_atoms(conf).reshape(-1, 1)
+        if hasattr(self, "proj_str"):
+            proj_str = self.proj_str
+        else:
+            proj_str = self.write_proj(self.rewrite_proj(conf))
+        return "\n".join([self.params_str, self.kpoints_str, proj_str, self.write_configuration(conf, atoms)])
 
     @classmethod
     def write_configuration(cls, conf: dpdata.System, atoms: np.ndarray = None):
@@ -169,21 +196,34 @@ class Wannier90Inputs:
         return conf_str
 
     @classmethod
-    def write_parameters(cls, wan_params: Dict[str, object], kpoints: np.ndarray, proj: Optional[Dict[str, str]]):
+    def write_parameters(cls, wan_params: Dict[str, object]):
         with TemporaryFile("w+") as f:
             for key, val in wan_params.items():
                 f.write(f"{key} = {val}\n")
-
-            if proj:
-                f.write("\nbegin projections\n")
-                for atom, option in proj.items():
-                    f.write(f"    {atom}: {option}\n")
-                f.write("end projections\n")
-
+            f.seek(0)
+            params_str = f.read()
+        return params_str
+    
+    @classmethod
+    def write_kpoints(cls, kpoints: np.ndarray):
+        with TemporaryFile("w+") as f:
             f.write("\nbegin kpoints\n")
             np.savetxt(f, kpoints, fmt = "%15.8f")
             f.write("end kpoints\n")
             f.seek(0)
-            params_str = f.read()
-        return params_str
-            
+            kpoints_str = f.read()
+        return kpoints_str
+
+    @classmethod
+    def write_proj(cls, proj: Dict[str, str]):
+        with TemporaryFile("w+") as f:
+            f.write("\nbegin projections\n")
+            if "units" in proj:
+                f.write(proj["units"] + "\n")
+                del proj["units"]
+            for site, option in proj.items():
+                f.write(f"    {site}: {option}\n")
+            f.write("end projections\n")
+            f.seek(0)
+            proj_str = f.read()
+        return proj_str

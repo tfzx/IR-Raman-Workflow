@@ -1,4 +1,5 @@
 from math import ceil
+from types import ModuleType
 from typing import Dict, List, Tuple, Union
 from pathlib import Path
 import abc
@@ -28,6 +29,7 @@ class Prepare(OP, abc.ABC):
             "task_setting": BigParameter(dict),
             "confs": Artifact(Path),
             "conf_fmt": BigParameter(dict),
+            "cal_dipole_python": Artifact(Path, optional = True),
             "pseudo": Artifact(Path)
         })
 
@@ -48,8 +50,13 @@ class Prepare(OP, abc.ABC):
         group_size: int = op_in["task_setting"]["group_size"]
         confs = read_conf(op_in["confs"], op_in["conf_fmt"])
         pseudo: Path = op_in["pseudo"]
+        if op_in["cal_dipole_python"]:
+            import imp
+            wc_python = imp.load_source("dipole_module", str(op_in["cal_dipole_python"]))
+        else:
+            wc_python = None
 
-        input_setting = self.init_inputs(input_setting, confs)
+        input_setting = self.init_inputs(input_setting, confs, wc_python)
         task_path, frames_list = self._exec_all(confs, pseudo, group_size)
         return OPIO({
             "input_setting": input_setting,
@@ -79,7 +86,10 @@ class Prepare(OP, abc.ABC):
         return task_path, frames_list
 
     @abc.abstractmethod
-    def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System) -> Dict[str, Union[str, dict]]:
+    def init_inputs(self, 
+                    input_setting: Dict[str, Union[str, dict]], 
+                    confs: dpdata.System,
+                    wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
         pass
 
     @abc.abstractmethod
