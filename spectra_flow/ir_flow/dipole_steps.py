@@ -84,7 +84,8 @@ class DipoleSteps(BasicSteps):
             },
             artifacts = {
                 "confs": confs_artifact,
-                "pseudo": pseudo_artifact
+                "pseudo": pseudo_artifact,
+                "cal_dipole_python": cal_dipole_python
             }
         )
         self.add(mlwf_step)

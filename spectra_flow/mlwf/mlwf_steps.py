@@ -36,7 +36,8 @@ class MLWFSteps(Steps):
         }
         self._input_artifacts = {
             "confs": InputArtifact(),
-            "pseudo": InputArtifact()
+            "pseudo": InputArtifact(),
+            "cal_dipole_python": InputArtifact(optional = True)
         }
         self._output_artifacts = {
             "backward": OutputArtifact(),
@@ -79,6 +80,7 @@ class MLWFSteps(Steps):
         input_setting = self.inputs.parameters["input_setting"]
         task_setting = self.inputs.parameters["task_setting"]
         confs_artifact = self.inputs.artifacts["confs"]
+        cal_dipole_python = self.inputs.artifacts["cal_dipole_python"]
         conf_fmt = self.inputs.parameters["conf_fmt"]
         prepare = Step(
             "prepare",
@@ -89,7 +91,8 @@ class MLWFSteps(Steps):
             ),
             artifacts={
                 "confs": confs_artifact,
-                "pseudo": self.inputs.artifacts["pseudo"]
+                "pseudo": self.inputs.artifacts["pseudo"],
+                "cal_dipole_python": cal_dipole_python
             },
             parameters={
                 "input_setting": input_setting,
