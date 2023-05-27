@@ -7,7 +7,6 @@ from dflow import (
 )
 from spectra_flow.ir_flow.dipole_steps import DipoleSteps
 from spectra_flow.mlwf.qe_wannier90 import PrepareQeWann, RunQeWann, CollectWann
-from spectra_flow.post.wannier_centroid_op import CalWC
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 from spectra_flow.utils import load_json, bohrium_login, get_executor
 
@@ -32,7 +31,6 @@ if __name__ == "__main__":
     dipole_template = DipoleSteps(
         name = "Dipole",
         mlwf_template = mlwf_template,
-        wc_op = CalWC,
         cal_executor = cal_executor
     )
 

@@ -33,8 +33,10 @@ from spectra_flow.utils import (
 )
 from spectra_flow.read_par import read_par
 
-def prep_par(parameters: Dict[str, dict], run_config: dict):
+def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False):
     inputs = read_par(parameters)
+    if debug:
+        print(list(inputs))
     name_dict = {IRflow.main_steps[i]: i for i in range(4)}
     name_dict["md"] = -1
     run_tree = IRflow.run_from_inputs(inputs)
@@ -78,16 +80,14 @@ def build_ir(
         run_config: dict = None, 
         upload_python_packages = None, 
         with_parallel = True,
-        debug = True
+        debug = False
     ):
     executors = {}
     for ex_name, exec_config in machine["executors"].items():
         executors[ex_name] = get_executor(exec_config)
     if run_config is None:
         run_config = {}
-    inputs, run_list = prep_par(parameters, run_config)
-    
-
+    inputs, run_list = prep_par(parameters, run_config, debug)
     ir_template = IRflow(
         "IR-Flow", 
         run_config, 
