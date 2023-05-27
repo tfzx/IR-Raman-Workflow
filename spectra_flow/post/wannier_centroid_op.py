@@ -47,11 +47,12 @@ class CalWC(OP):
             cal_wc = self.cal_wc
         wfc_d = op_in["wannier_function_centers"]
         wc_d = {}
+        nframes = confs.get_nframes()
         for key in wfc_d:
-            wfc = np.loadtxt(wfc_d[key], dtype = float, ndmin = 2)
-            wc = cal_wc(confs, wfc)
+            wfc = np.loadtxt(wfc_d[key], dtype = float, ndmin = 2).reshape(nframes, -1, 3)
+            wc = cal_wc(confs, wfc).reshape(nframes, -1)
             wc_path = Path(f"wc_{key}.raw")
-            np.savetxt(wc_path, wc, fmt = "%15.8f")
+            np.savetxt(wc_path, wc)
             wc_d[key] = wc_path
         return OPIO({
             "wannier_centroid": wc_d

@@ -55,7 +55,7 @@ class CollectWFC(OP, abc.ABC):
             with set_directory(p):
                 wfc[frame] = self.get_one_frame(frame).flatten()
         wfc_path = Path("wfc.raw")
-        np.savetxt(wfc_path, wfc, fmt = "%15.8f")
+        np.savetxt(wfc_path, wfc)
         return {
             "ori": wfc_path
         }
