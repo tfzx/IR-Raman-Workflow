@@ -23,5 +23,5 @@ if __name__ == "__main__":
     while wf.query_status() in ["Pending", "Running"]:
         time.sleep(1)
     assert(wf.query_status() == "Succeeded")
-    lcurve = download_artifact(wf.query_step("water")[0].outputs.artifacts["lcurve"], path = "back")[0]
+    lcurve = download_artifact(wf.query_step("ir-example3")[0].outputs.artifacts["lcurve"], path = "back")[0]
     print(Path(lcurve).read_text())
