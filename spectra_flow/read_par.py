@@ -1,8 +1,8 @@
 
-from typing import Dict, List
+from typing import Dict, List, Tuple
 from spectra_flow.utils import (
     complete_by_default,
-    get_executor
+    load_json
 )
 
 _default_par = {
@@ -54,6 +54,26 @@ def read_par(parameters: Dict[str, dict]):
     ]
     for read_config in read_list:
         read_inputs(inputs, *read_config)
+
+    file_config_list = [
+        ("dp_setting", "train_inputs"),
+        ("input_setting"),
+        ("task_setting")
+    ]
+    for keys in file_config_list:
+        config_from_file(inputs, keys)
+    # if "dp_setting" in inputs and "train_inputs" in inputs["dp_setting"] \
+    #     and isinstance(inputs["dp_setting"]["train_inputs"], str):
+    #     inputs["dp_setting"]["train_inputs"] = load_json(inputs["dp_setting"]["train_inputs"])
+    # if "input_setting" in inputs:
+    #     if isinstance(inputs["input_setting"], str):
+    #         inputs["input_setting"] = load_json(inputs["input_setting"])
+    #     elif isinstance(inputs["input_setting"], list):
+    #         input_setting_l = []
+    #         for p in inputs["input_setting"]:
+    #             input_setting_l.append(load_json(p))
+    #         inputs["input_setting"] = input_setting_l
+
     sys_fmt_map = {
         "train_confs": "train_conf_fmt",
         "sampled_system": "sys_fmt",
@@ -66,7 +86,23 @@ def read_par(parameters: Dict[str, dict]):
             inputs[fmt_name] = sys_fmt
     return inputs
 
-def read_inputs(inputs_dict: dict, name: str, par: dict, keys: List[str]):
+def config_from_file(inputs: dict, keys: Tuple[str]):
+    for key in keys[:-1]:
+        if not key in inputs:
+            return
+        else:
+            inputs = inputs[key]
+    last_key = keys[-1]
+    if isinstance(inputs[last_key], str):
+        inputs[last_key] = load_json(inputs[last_key])
+    elif isinstance(inputs[last_key], list):
+        config_list = []
+        for p in inputs[last_key]:
+            config_list.append(load_json(p))
+        inputs[last_key] = config_list
+
+
+def read_inputs(inputs_dict: dict, name: str, par: dict, keys: Tuple[str]):
     if keys[0] in par:
         for key in keys:
             par = par[key]
