@@ -1,7 +1,9 @@
 from typing import Dict, List, Optional, Union
+from types import ModuleType
 from pathlib import Path
 import dpdata, numpy as np, shutil
 from spectra_flow.mlwf.mlwf_ops import Prepare, RunMLWF, CollectWFC
+from spectra_flow.mlwf.qe_wannier90 import CollectWann
 from spectra_flow.mlwf.inputs import (
     QeParamsConfs, 
     QeParams, 
@@ -75,7 +77,10 @@ class PrepareEfQeWann(Prepare):
             input_pw2wan["inputpp"]["seedname"] = f"{self.name}_{ef_name}"
             self.pw2wan_writers[ef_name] = QeParams(input_pw2wan)
 
-    def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
+    def init_inputs(self, 
+                    input_setting: Dict[str, Union[str, dict]], 
+                    confs: dpdata.System,
+                    wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
         self.name = input_setting["name"]
         assert input_setting["with_efield"]
         complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
@@ -92,13 +97,12 @@ class PrepareEfQeWann(Prepare):
         self.wannier90_writer = Wannier90Inputs(wan_params, proj, kpoints, confs)
         return input_setting
 
-    def write_one_frame(self, frame: int):
+    def prep_one_frame(self, frame: int):
         for ef_name in self.scf_writers:
             with set_directory(ef_name, mkdir = True):
                 Path(f"scf_{ef_name}.in").write_text(self.scf_writers[ef_name].write(frame))
                 Path(f"{self.name}_{ef_name}.pw2wan").write_text(self.pw2wan_writers[ef_name].write(frame))
                 Path(f"{self.name}_{ef_name}.win").write_text(self.wannier90_writer.write(frame))
-        return super().write_one_frame(frame)
 
 
 class RunEfQeWann(RunMLWF):
@@ -145,32 +149,10 @@ class RunEfQeWann(RunMLWF):
         return backward_dir
 
 
-class CollectEfWann(CollectWFC):
-    def collect_wfc(self, input_setting: dict, backward: List[Path]) -> Dict[str, Path]:
-        if not backward:
-            return np.array([])
-        self.init_params(input_setting, backward)
-        namelist = ["ori"] + [f"ef_{key}" for key in input_setting["efields"].keys()]
-        wfc: Dict[str, np.ndarray] = {}
-        for key in namelist:
-            wfc[key] = np.zeros((len(backward), self.num_wann * 3), dtype = float)
-        for frame, p in enumerate(backward):
-            with set_directory(p):
-                for key in namelist:
-                    wfc[key][frame] = self.get_one_frame(f"{self.name}_{key}").flatten()
-        wfc_path = {}
-        for key in namelist:
-            wfc_path[key] = Path(f"wfc_{key}.raw")
-            np.savetxt(wfc_path[key], wfc[key], fmt = "%15.8f")
-        return wfc_path
-
-    def get_one_frame(self, name: str) -> np.ndarray:
-        return np.loadtxt(f'{name}_centres.xyz', dtype = float, skiprows = 2, usecols = [1, 2, 3], max_rows = self.num_wann)
-    
-    def init_params(self, input_setting: dict, backward: List[Path]):
-        self.name = input_setting["name"]
-        return super().init_params(input_setting, backward)
-
-    def get_num_wann(self, file_path: Path) -> int:
-        num_wann = int(np.loadtxt(file_path / f'{self.name}_ori_centres.xyz', dtype = int, max_rows = 1)) - self.confs.get_natoms()
-        return num_wann
+class CollectEfWann(CollectWann):
+    def init_name_dict(self, input_setting: dict):
+        name = input_setting["name"]
+        keylist = ["ori"] + [f"ef_{key}" for key in input_setting["efields"].keys()]
+        self.name_dict = {
+            key: f"{name}_{key}" for key in keylist
+        }

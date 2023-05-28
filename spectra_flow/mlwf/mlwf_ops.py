@@ -82,7 +82,7 @@ class Prepare(OP, abc.ABC):
                     subtask_name = f"conf.{frame:06d}"
                     print(subtask_name)
                     with set_directory(subtask_name, mkdir = True):
-                        self.write_one_frame(frame)
+                        self.prep_one_frame(frame)
         return task_path, frames_list
 
     @abc.abstractmethod
@@ -93,7 +93,7 @@ class Prepare(OP, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def write_one_frame(self, frame: int):
+    def prep_one_frame(self, frame: int):
         pass
 
 class RunMLWF(OP, abc.ABC):
@@ -203,39 +203,44 @@ class CollectWFC(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         input_setting: dict = op_in["input_setting"]
-        self.confs = read_conf(op_in["confs"], op_in["conf_fmt"])
+        conf_sys = read_conf(op_in["confs"], op_in["conf_fmt"])
         backward: List[Path] = op_in["backward"]
 
-        wfc = self.collect_wfc(input_setting, backward)
+        wfc_path = self.collect_wfc(input_setting, conf_sys, backward)
         return OPIO({
-            "wannier_function_centers": wfc
+            "wannier_function_centers": wfc_path
         })
     
-    def collect_wfc(self, input_setting: dict, backward: List[Path]) -> Dict[str, Path]:
-        if not backward:
-            return np.array([])
-        self.init_params(input_setting, backward)
-        wfc = np.zeros((len(backward), self.num_wann * 3), dtype = float)
+    def collect_wfc(self, input_setting: dict, conf_sys: dpdata.System, backward: List[Path]):
+        assert len(backward) > 0
+        self.init_params(input_setting, conf_sys, backward)
+        total_wfc: Dict[str, np.ndarray] = {}
+        def update_wfc(wfc_frame: Dict[str, np.ndarray], frame: int):
+            for key, wfc_arr in wfc_frame.items():
+                if key not in total_wfc:
+                    total_wfc[key] = np.zeros((conf_sys.get_nframes(), wfc_arr.size), dtype = float)
+                total_wfc[key][frame] = wfc_arr.flatten()
         for frame, p in enumerate(backward):
             with set_directory(p):
-                wfc[frame] = self.get_one_frame(frame).flatten()
-        wfc_path = Path("wfc.raw")
-        np.savetxt(wfc_path, wfc)
-        return {
-            "ori": wfc_path
-        }
+                update_wfc(self.get_one_frame(frame), frame)
+        wfc_path: Dict[str, Path] = {}
+        for key, wfc in total_wfc.items():
+            wfc_path[key] = Path(f"wfc_{key}.raw")
+            np.savetxt(wfc_path[key], wfc)
+        return wfc_path
+
 
     @abc.abstractmethod
-    def get_one_frame(self, frame: int) -> np.ndarray:
+    def get_one_frame(self, frame: int) -> Dict[str, np.ndarray]:
         pass
 
     @abc.abstractmethod
-    def init_params(self, input_setting: dict, backward: List[Path]):
+    def init_params(self, input_setting: dict, conf_sys: dpdata.System, example_file: Path):
         try:
             self.num_wann = input_setting["num_wann"]
         except KeyError:
-            self.num_wann = self.get_num_wann(backward[0])
+            self.num_wann = self.get_num_wann(conf_sys, example_file)
 
     @abc.abstractmethod
-    def get_num_wann(self, file_path: Path) -> int:
+    def get_num_wann(self, conf_sys: dpdata.System, example_file: Path) -> int:
         pass

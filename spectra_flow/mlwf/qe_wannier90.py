@@ -75,13 +75,12 @@ class PrepareQeWann(Prepare):
         self.wannier90_writer = Wannier90Inputs(wan_params, proj, kpoints, confs, rewrite_atoms, rewrite_proj)
         return input_setting
 
-    def write_one_frame(self, frame: int):
+    def prep_one_frame(self, frame: int):
         Path("scf.in").write_text(self.scf_writer.write(frame))
         if self.run_nscf:
             Path("nscf.in").write_text(self.nscf_writer.write(frame))
         Path(f"{self.name}.pw2wan").write_text(self.pw2wan_writer.write(frame))
         Path(f"{self.name}.win").write_text(self.wannier90_writer.write(frame))
-        return super().write_one_frame(frame)
 
 
 class RunQeWann(RunMLWF):
@@ -108,13 +107,25 @@ class RunQeWann(RunMLWF):
         return backward_dir
 
 class CollectWann(CollectWFC):
-    def get_one_frame(self, frame: int) -> np.ndarray:
-        return np.loadtxt(f'{self.name}_centres.xyz', dtype = float, skiprows = 2, usecols = [1, 2, 3], max_rows = self.num_wann)
-    
-    def init_params(self, input_setting: dict, backward: List[Path]):
-        self.name = input_setting["name"]
-        return super().init_params(input_setting, backward)
+    def init_params(self, input_setting: dict, conf_sys: dpdata.System, example_file: Path):
+        self.init_name_dict(input_setting)
+        super().init_params(input_setting, conf_sys, example_file)
 
-    def get_num_wann(self, file_path: Path) -> int:
-        num_wann = int(np.loadtxt(file_path / f'{self.name}_centres.xyz', dtype = int, max_rows = 1)) - self.confs.get_natoms()
+    def init_name_dict(self, input_setting: dict):
+        self.name_dict = {
+            "ori": input_setting["name"]
+        }
+
+    def get_one_frame(self, frame: int) -> Dict[str, np.ndarray]:
+        return {key: self.read_wfc(name) for key, name in self.name_dict.items()}
+    
+    def read_wfc(self, name: str) -> np.ndarray:
+        return np.loadtxt(f'{name}_centres.xyz', dtype = float, skiprows = 2, usecols = [1, 2, 3], max_rows = self.num_wann)
+
+    def get_num_wann(self, conf_sys: dpdata.System, example_file: Path) -> int:
+        name = next(iter(self.name_dict.values()))
+        num_wann = int(np.loadtxt(
+            example_file / f'{name}_centres.xyz', 
+            dtype = int, max_rows = 1
+        )) - conf_sys.get_natoms()
         return num_wann
