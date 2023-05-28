@@ -4,10 +4,10 @@ from pathlib import Path
 import dpdata, os
 
 class MockedPrepare(Prepare):
-    def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
+    def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
         self.task_path = []
         self.conf_path = []
-        return super().init_inputs(input_setting, confs)
+        return super().init_inputs(mlwf_setting, confs)
     
     def write_one_frame(self, frame: int):
         cwd = Path(os.getcwd())

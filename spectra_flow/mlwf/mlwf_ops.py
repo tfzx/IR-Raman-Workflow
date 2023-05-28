@@ -25,7 +25,7 @@ class Prepare(OP, abc.ABC):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "input_setting": BigParameter(dict),
+            "mlwf_setting": BigParameter(dict),
             "task_setting": BigParameter(dict),
             "confs": Artifact(Path),
             "conf_fmt": BigParameter(dict),
@@ -36,7 +36,7 @@ class Prepare(OP, abc.ABC):
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "input_setting": BigParameter(dict),
+            "mlwf_setting": BigParameter(dict),
             "task_path": Artifact(List[Path], archive=None),
             "frames_list": BigParameter(List[Tuple[int]])
         })
@@ -46,7 +46,7 @@ class Prepare(OP, abc.ABC):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
+        mlwf_setting: Dict[str, Union[str, dict]] = op_in["mlwf_setting"]
         group_size: int = op_in["task_setting"]["group_size"]
         confs = read_conf(op_in["confs"], op_in["conf_fmt"])
         pseudo: Path = op_in["pseudo"]
@@ -56,10 +56,10 @@ class Prepare(OP, abc.ABC):
         else:
             wc_python = None
 
-        input_setting = self.init_inputs(input_setting, confs, wc_python)
+        mlwf_setting = self.init_inputs(mlwf_setting, confs, wc_python)
         task_path, frames_list = self._exec_all(confs, pseudo, group_size)
         return OPIO({
-            "input_setting": input_setting,
+            "mlwf_setting": mlwf_setting,
             "task_path": task_path,
             "frames_list": frames_list
         })
@@ -87,7 +87,7 @@ class Prepare(OP, abc.ABC):
 
     @abc.abstractmethod
     def init_inputs(self, 
-                    input_setting: Dict[str, Union[str, dict]], 
+                    mlwf_setting: Dict[str, Union[str, dict]], 
                     confs: dpdata.System,
                     wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
         pass
@@ -104,7 +104,7 @@ class RunMLWF(OP, abc.ABC):
     def get_input_sign(cls):
         return OPIOSign({
             "task_path": Artifact(Path),
-            "input_setting": BigParameter(dict),
+            "mlwf_setting": BigParameter(dict),
             "task_setting": BigParameter(dict),
             "frames": BigParameter(Tuple[int]),
         })
@@ -121,8 +121,8 @@ class RunMLWF(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         task_path: Path = op_in["task_path"]
-        self.name: str = op_in["input_setting"]["name"]
-        self.input_setting = op_in["input_setting"]
+        self.name: str = op_in["mlwf_setting"]["name"]
+        self.mlwf_setting = op_in["mlwf_setting"]
         task_setting: dict = op_in["task_setting"]
         self.backward_list: List[str] = task_setting["backward_list"]
         self.backward_dir_name: str = task_setting["backward_dir_name"]
@@ -185,7 +185,7 @@ class CollectWFC(OP, abc.ABC):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "input_setting": BigParameter(dict),
+            "mlwf_setting": BigParameter(dict),
             "confs": Artifact(Path),
             "conf_fmt": BigParameter(dict),
             "backward": Artifact(List[Path]),
@@ -202,18 +202,18 @@ class CollectWFC(OP, abc.ABC):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        input_setting: dict = op_in["input_setting"]
+        mlwf_setting: dict = op_in["mlwf_setting"]
         conf_sys = read_conf(op_in["confs"], op_in["conf_fmt"])
         backward: List[Path] = op_in["backward"]
 
-        wfc_path = self.collect_wfc(input_setting, conf_sys, backward)
+        wfc_path = self.collect_wfc(mlwf_setting, conf_sys, backward)
         return OPIO({
             "wannier_function_centers": wfc_path
         })
     
-    def collect_wfc(self, input_setting: dict, conf_sys: dpdata.System, backward: List[Path]):
+    def collect_wfc(self, mlwf_setting: dict, conf_sys: dpdata.System, backward: List[Path]):
         assert len(backward) > 0
-        self.init_params(input_setting, conf_sys, backward)
+        self.init_params(mlwf_setting, conf_sys, backward)
         total_wfc: Dict[str, np.ndarray] = {}
         def update_wfc(wfc_frame: Dict[str, np.ndarray], frame: int):
             for key, wfc_arr in wfc_frame.items():
@@ -235,9 +235,9 @@ class CollectWFC(OP, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def init_params(self, input_setting: dict, conf_sys: dpdata.System, example_file: Path):
+    def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):
         try:
-            self.num_wann = input_setting["num_wann"]
+            self.num_wann = mlwf_setting["num_wann"]
         except KeyError:
             self.num_wann = self.get_num_wann(conf_sys, example_file)
 

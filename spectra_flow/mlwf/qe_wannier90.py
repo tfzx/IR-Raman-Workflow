@@ -28,34 +28,34 @@ class PrepareQeWann(Prepare):
     def __init__(self):
         super().__init__()
 
-    def init_inputs(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: ModuleType):
-        self.name = input_setting["name"]
-        self.run_nscf = input_setting["dft_params"]["cal_type"] == "scf+nscf"
+    def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: ModuleType):
+        self.name = mlwf_setting["name"]
+        self.run_nscf = mlwf_setting["dft_params"]["cal_type"] == "scf+nscf"
 
-        k_grid = input_setting["dft_params"]["k_grid"]
+        k_grid = mlwf_setting["dft_params"]["k_grid"]
         self.DEFAULT_PARAMS["control"]["prefix"] = self.name
-        qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
-        if "num_wann" in input_setting["wannier90_params"]["wan_params"]:
-            input_setting["num_wann"] = input_setting["wannier90_params"]["wan_params"]["num_wann"]
+        qe_params = complete_by_default(mlwf_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
+        if "num_wann" in mlwf_setting["wannier90_params"]["wan_params"]:
+            mlwf_setting["num_wann"] = mlwf_setting["wannier90_params"]["wan_params"]["num_wann"]
 
         input_scf, kpoints_scf = complete_qe(qe_params, "scf", k_grid, confs)
-        self.scf_writer = QeParamsConfs(input_scf, kpoints_scf, input_setting["dft_params"]["atomic_species"], confs)
+        self.scf_writer = QeParamsConfs(input_scf, kpoints_scf, mlwf_setting["dft_params"]["atomic_species"], confs)
         if self.run_nscf:
             input_nscf, kpoints_nscf = complete_qe(qe_params, "nscf", k_grid, confs)
-            self.nscf_writer = QeParamsConfs(input_nscf, kpoints_nscf, input_setting["dft_params"]["atomic_species"], confs)
+            self.nscf_writer = QeParamsConfs(input_nscf, kpoints_nscf, mlwf_setting["dft_params"]["atomic_species"], confs)
         input_pw2wan = complete_pw2wan(
-            input_setting["dft_params"]["pw2wan_params"], 
+            mlwf_setting["dft_params"]["pw2wan_params"], 
             self.name, 
             input_scf["control"]["prefix"],
             input_scf["control"]["outdir"]
             )
         self.pw2wan_writer = QeParams(input_pw2wan)
 
-        wannier90_params = input_setting["wannier90_params"]
+        wannier90_params = mlwf_setting["wannier90_params"]
         wan_params, proj, kpoints = complete_wannier90(
             wannier90_params["wan_params"], 
             wannier90_params.get("projections", {}),
-            input_setting["dft_params"]["k_grid"]
+            mlwf_setting["dft_params"]["k_grid"]
         )
         rewrite_atoms = None
         rewrite_proj = None
@@ -73,7 +73,7 @@ class PrepareQeWann(Prepare):
                     print(f"[WARNING] An error occurred while importing the method 'rewrite_proj': {e}")
                     print("Use projections defined in wannier90_params.")
         self.wannier90_writer = Wannier90Inputs(wan_params, proj, kpoints, confs, rewrite_atoms, rewrite_proj)
-        return input_setting
+        return mlwf_setting
 
     def prep_one_frame(self, frame: int):
         Path("scf.in").write_text(self.scf_writer.write(frame))
@@ -107,13 +107,13 @@ class RunQeWann(RunMLWF):
         return backward_dir
 
 class CollectWann(CollectWFC):
-    def init_params(self, input_setting: dict, conf_sys: dpdata.System, example_file: Path):
-        self.init_name_dict(input_setting)
-        super().init_params(input_setting, conf_sys, example_file)
+    def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):
+        self.init_name_dict(mlwf_setting)
+        super().init_params(mlwf_setting, conf_sys, example_file)
 
-    def init_name_dict(self, input_setting: dict):
+    def init_name_dict(self, mlwf_setting: dict):
         self.name_dict = {
-            "ori": input_setting["name"]
+            "ori": mlwf_setting["name"]
         }
 
     def get_one_frame(self, frame: int) -> Dict[str, np.ndarray]:

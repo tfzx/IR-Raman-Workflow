@@ -30,7 +30,7 @@ class DipoleSteps(BasicSteps):
     @classmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {
-            "input_setting": InputParameter(type = dict, value = {}),
+            "mlwf_setting": InputParameter(type = dict, value = {}),
             "task_setting": InputParameter(type = dict, value = {}),
             "conf_fmt": InputParameter(type = dict, value = {})
         }, {
@@ -68,7 +68,7 @@ class DipoleSteps(BasicSteps):
             cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]]
         ):
-        input_setting = self.inputs.parameters["input_setting"]
+        mlwf_setting = self.inputs.parameters["mlwf_setting"]
         task_setting = self.inputs.parameters["task_setting"]
         conf_fmt = self.inputs.parameters["conf_fmt"]
         confs_artifact = self.inputs.artifacts["confs"]
@@ -78,7 +78,7 @@ class DipoleSteps(BasicSteps):
             name = "cal-MLWF",
             template = mlwf_template,
             parameters = {
-                "input_setting": input_setting,
+                "mlwf_setting": mlwf_setting,
                 "task_setting": task_setting,
                 "conf_fmt": conf_fmt
             },

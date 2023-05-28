@@ -24,7 +24,7 @@ class TestPrepare(unittest.TestCase):
     def run_t(self, group_size: int):
         prepare = MockedPrepare()
         op_in = OPIO({
-            "input_setting": {},
+            "mlwf_setting": {},
             "task_setting": {"group_size": group_size},
             "confs": self.confs,
             "conf_fmt": {

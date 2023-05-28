@@ -7,7 +7,7 @@
         "global": {},
         "dipole": {
             "dft_type": "'qe' or 'qe_cp'",
-            "input_setting": {},
+            "mlwf_setting": {},
             "task_setting": {}
         },
         "deep_model": {         # The parameters of deep wannier model.

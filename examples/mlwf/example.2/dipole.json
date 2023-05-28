@@ -1,6 +1,6 @@
 {
     "dft_type": "qe_cp",
-    "input_setting": {
+    "mlwf_setting": {
         "name": "water",
         "num_wann": 256,
         "dft_params": {

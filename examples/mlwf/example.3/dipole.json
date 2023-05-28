@@ -1,6 +1,6 @@
 {
     "dft_type": "qe",
-    "input_setting": {
+    "mlwf_setting": {
         "name": "water",
         "dft_params": {
             "cal_type": "scf",

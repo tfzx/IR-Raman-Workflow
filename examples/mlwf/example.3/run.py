@@ -42,7 +42,7 @@ if __name__ == "__main__":
         template = polar_template,
         parameters = {
             "polar_setting": polar_config,
-            "input_setting": dipole_config["input_setting"],
+            "mlwf_setting": dipole_config["mlwf_setting"],
             "task_setting": dipole_config["task_setting"],
             "conf_fmt": {
                 "type_map": ["O", "H"],

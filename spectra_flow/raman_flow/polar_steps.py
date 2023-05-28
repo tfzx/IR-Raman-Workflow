@@ -32,7 +32,7 @@ class PolarSteps(BasicSteps):
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {
             "polar_setting": InputParameter(type = dict, value = {}),
-            "input_setting": InputParameter(type = dict, value = {}),
+            "mlwf_setting": InputParameter(type = dict, value = {}),
             "task_setting": InputParameter(type = dict, value = {}),
             "conf_fmt": InputParameter(type = dict, value = {})
         }, {
@@ -75,7 +75,7 @@ class PolarSteps(BasicSteps):
             upload_python_packages: List[Union[str, Path]]
         ):
         polar_setting = self.inputs.parameters["polar_setting"]
-        input_setting = self.inputs.parameters["input_setting"]
+        mlwf_setting = self.inputs.parameters["mlwf_setting"]
         task_setting = self.inputs.parameters["task_setting"]
         conf_fmt = self.inputs.parameters["conf_fmt"]
         confs_artifact = self.inputs.artifacts["confs"]
@@ -89,7 +89,7 @@ class PolarSteps(BasicSteps):
             ),
             parameters = {
                 "polar_setting": polar_setting,
-                "input_setting": input_setting
+                "mlwf_setting": mlwf_setting
             },
             executor = base_exexutor
         )
@@ -104,7 +104,7 @@ class PolarSteps(BasicSteps):
             "cal-dipole",
             dipole_template,
             parameters = {
-                "input_setting": prep_polar.outputs.parameters["input_setting"],
+                "mlwf_setting": prep_polar.outputs.parameters["mlwf_setting"],
                 "task_setting": task_setting,
                 "conf_fmt": conf_fmt
             },

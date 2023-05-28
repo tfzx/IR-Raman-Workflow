@@ -126,7 +126,7 @@ class IRflow(AdaptiveFlow):
     def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
         return {
             "dipole": {
-                "input_setting": [(None, "input_setting")],
+                "mlwf_setting": [(None, "mlwf_setting")],
                 "task_setting": [(None, "task_setting")],
                 "conf_fmt": [(None, "train_conf_fmt")],
                 "confs": [(None, "train_confs")],

@@ -38,7 +38,7 @@ if __name__ == "__main__":
         name = "Dipole-Step",
         template = dipole_template,
         parameters = {
-            "input_setting": dipole_config["input_setting"],
+            "mlwf_setting": dipole_config["mlwf_setting"],
             "task_setting": dipole_config["task_setting"],
             "conf_fmt": {
                 "type_map": ["O", "H"],

@@ -30,7 +30,7 @@ class MLWFSteps(Steps):
         ) -> None:
         
         self._input_parameters = {
-            "input_setting": InputParameter(type = dict, value = {}),
+            "mlwf_setting": InputParameter(type = dict, value = {}),
             "task_setting": InputParameter(type = dict, value = {}),
             "conf_fmt": InputParameter(type = dict, value = {})
         }
@@ -77,7 +77,7 @@ class MLWFSteps(Steps):
             collect_executor: Executor,
             upload_python_packages: List[Union[str, Path]]
         ):
-        input_setting = self.inputs.parameters["input_setting"]
+        mlwf_setting = self.inputs.parameters["mlwf_setting"]
         task_setting = self.inputs.parameters["task_setting"]
         confs_artifact = self.inputs.artifacts["confs"]
         cal_dipole_python = self.inputs.artifacts["cal_dipole_python"]
@@ -95,7 +95,7 @@ class MLWFSteps(Steps):
                 "cal_dipole_python": cal_dipole_python
             },
             parameters={
-                "input_setting": input_setting,
+                "mlwf_setting": mlwf_setting,
                 "task_setting": task_setting,
                 "conf_fmt": conf_fmt
             },
@@ -117,7 +117,7 @@ class MLWFSteps(Steps):
                 python_packages = upload_python_packages
             ),
             parameters = {
-                "input_setting": prepare.outputs.parameters["input_setting"],
+                "mlwf_setting": prepare.outputs.parameters["mlwf_setting"],
                 "task_setting": task_setting,
                 "frames": prepare.outputs.parameters["frames_list"]
             },
@@ -140,7 +140,7 @@ class MLWFSteps(Steps):
                 "backward": run.outputs.artifacts["backward"]
             },
             parameters={
-                "input_setting": prepare.outputs.parameters["input_setting"],
+                "mlwf_setting": prepare.outputs.parameters["mlwf_setting"],
                 "conf_fmt": conf_fmt
             },
             executor = collect_executor

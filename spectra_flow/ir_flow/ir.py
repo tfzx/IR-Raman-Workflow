@@ -71,7 +71,7 @@ class IRinputs:
         self.run_config = run_config
         self.run_input_parameters: Dict[str, List[str]] = {
             "dipole": [
-                "input_setting",
+                "mlwf_setting",
                 "task_setting",
                 "train_conf_fmt"
             ],
@@ -240,12 +240,12 @@ class IRchecker:
         complete_by_default(self.global_config, self._default_config)
         self.global_global = self.global_config["config"]["global"]
         if "dipole" in self.config:
-            complete_by_default(self.config["dipole"]["input_setting"], {"name": self.global_global["name"]})
+            complete_by_default(self.config["dipole"]["mlwf_setting"], {"name": self.global_global["name"]})
 
     def _init_reader(self):
         self._inputs_p_reader = {
             "global": lambda: self.config["global"],
-            "input_setting": lambda: self.config["dipole"]["input_setting"],
+            "mlwf_setting": lambda: self.config["dipole"]["mlwf_setting"],
             "task_setting": lambda: self.config["dipole"]["task_setting"],
             "dp_setting": lambda: self.config["deep_model"],
             "train_conf_fmt": lambda: None,
@@ -338,11 +338,11 @@ class IRchecker:
     
     # def load_dipole(self):
     #     dipole_config = self.config["dipole"]
-    #     input_setting = dipole_config["input_setting"]
-    #     complete_by_default(input_setting, {"name": self.global_global["name"]})
+    #     mlwf_setting = dipole_config["mlwf_setting"]
+    #     complete_by_default(mlwf_setting, {"name": self.global_global["name"]})
     #     task_setting = dipole_config["task_setting"]
     #     self._input_parameters.update({
-    #         "input_setting": input_setting,
+    #         "mlwf_setting": mlwf_setting,
     #         "task_setting": task_setting
     #     })
     #     if self.run_config["start_steps"] == "dipole":
@@ -421,7 +421,7 @@ class IRflow(Steps):
         input_artifacts_l += optional_artifacts_l
         _input_parameters_temp = {
             "global": InputParameter(type = dict, value = {}),
-            "input_setting": InputParameter(type = dict, value = {}),
+            "mlwf_setting": InputParameter(type = dict, value = {}),
             "task_setting": InputParameter(type = dict, value = {}),
             "dp_setting": InputParameter(type = dict, value = {}),
             "train_conf_fmt": InputParameter(type = dict, value = {}),
@@ -517,7 +517,7 @@ class IRflow(Steps):
                 "Cal-Dipole",
                 dipole_template,
                 parameters = {
-                    "input_setting": self.inputs.parameters["input_setting"],
+                    "mlwf_setting": self.inputs.parameters["mlwf_setting"],
                     "task_setting": self.inputs.parameters["task_setting"],
                     "conf_fmt": self.inputs.parameters["train_conf_fmt"]
                 },

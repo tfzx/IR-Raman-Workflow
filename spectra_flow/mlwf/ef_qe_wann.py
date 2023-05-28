@@ -43,13 +43,13 @@ class PrepareEfQeWann(Prepare):
         })
         return params
 
-    def get_writers(self, input_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
+    def get_writers(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System):
         # k_grid must be (1, 1, 1)
-        k_grid = input_setting["dft_params"]["k_grid"]
-        qe_params = input_setting["dft_params"]["qe_params"]
-        efields: Dict[str, List[float]] = input_setting["efields"]
+        k_grid = mlwf_setting["dft_params"]["k_grid"]
+        qe_params = mlwf_setting["dft_params"]["qe_params"]
+        efields: Dict[str, List[float]] = mlwf_setting["efields"]
         input_pw2wan = complete_pw2wan(
-            input_setting["dft_params"]["pw2wan_params"], 
+            mlwf_setting["dft_params"]["pw2wan_params"], 
             f"{self.name}_ori", 
             qe_params["control"]["prefix"],
             qe_params["control"]["outdir"]
@@ -59,7 +59,7 @@ class PrepareEfQeWann(Prepare):
         params_ori = self.complete_ef(qe_params, is_ori = True, efield = None)
         input_ori, kpoints_ori = complete_qe(params_ori, "scf", k_grid, confs)
         self.scf_writers = {
-            "ori": QeParamsConfs(input_ori, kpoints_ori, input_setting["dft_params"]["atomic_species"], confs)
+            "ori": QeParamsConfs(input_ori, kpoints_ori, mlwf_setting["dft_params"]["atomic_species"], confs)
         }
         self.pw2wan_writers = {
             "ori": QeParams(input_pw2wan)
@@ -72,30 +72,30 @@ class PrepareEfQeWann(Prepare):
             params = self.complete_ef(qe_params, is_ori = False, efield = efield)
             inputs, kpoints = complete_qe(params, "scf", k_grid, confs)
             self.scf_writers[ef_name] = QeParamsConfs(
-                inputs, kpoints, input_setting["dft_params"]["atomic_species"], confs
+                inputs, kpoints, mlwf_setting["dft_params"]["atomic_species"], confs
             )
             input_pw2wan["inputpp"]["seedname"] = f"{self.name}_{ef_name}"
             self.pw2wan_writers[ef_name] = QeParams(input_pw2wan)
 
     def init_inputs(self, 
-                    input_setting: Dict[str, Union[str, dict]], 
+                    mlwf_setting: Dict[str, Union[str, dict]], 
                     confs: dpdata.System,
                     wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
-        self.name = input_setting["name"]
-        assert input_setting["with_efield"]
-        complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
-        if "num_wann" in input_setting["wannier90_params"]["wan_params"]:
-            input_setting["num_wann"] = input_setting["wannier90_params"]["wan_params"]["num_wann"]
+        self.name = mlwf_setting["name"]
+        assert mlwf_setting["with_efield"]
+        complete_by_default(mlwf_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
+        if "num_wann" in mlwf_setting["wannier90_params"]["wan_params"]:
+            mlwf_setting["num_wann"] = mlwf_setting["wannier90_params"]["wan_params"]["num_wann"]
 
-        self.get_writers(input_setting, confs)
+        self.get_writers(mlwf_setting, confs)
         
         wan_params, proj, kpoints = complete_wannier90(
-            input_setting["wannier90_params"]["wan_params"], 
-            input_setting["wannier90_params"]["projections"],
-            input_setting["dft_params"]["k_grid"]
+            mlwf_setting["wannier90_params"]["wan_params"], 
+            mlwf_setting["wannier90_params"]["projections"],
+            mlwf_setting["dft_params"]["k_grid"]
         )
         self.wannier90_writer = Wannier90Inputs(wan_params, proj, kpoints, confs)
-        return input_setting
+        return mlwf_setting
 
     def prep_one_frame(self, frame: int):
         for ef_name in self.scf_writers:
@@ -116,7 +116,7 @@ class RunEfQeWann(RunMLWF):
         self.wannier90_pp_cmd = commands.get("wannier90_pp", "wannier90.x")
     
     def run_one_frame(self) -> Path:
-        out_dir = Path(self.input_setting["dft_params"]["qe_params"]["control"]["outdir"])
+        out_dir = Path(self.mlwf_setting["dft_params"]["qe_params"]["control"]["outdir"])
         ori_p = Path("ori")
         backward_dir = Path(self.backward_dir_name)
         backward_dir.mkdir()
@@ -128,7 +128,7 @@ class RunEfQeWann(RunMLWF):
             self.run(" ".join([self.wannier_cmd, f"{self.name}_ori"]))
             shutil.copy(f"{self.name}_ori_centres.xyz", back_abs)
         ori_p = ori_p.absolute()
-        for ef_name in self.input_setting["efields"]:
+        for ef_name in self.mlwf_setting["efields"]:
             ef_name = f"ef_{ef_name}"
             with set_directory(ef_name):
                 shutil.copytree(ori_p / out_dir, out_dir)
@@ -150,9 +150,9 @@ class RunEfQeWann(RunMLWF):
 
 
 class CollectEfWann(CollectWann):
-    def init_name_dict(self, input_setting: dict):
-        name = input_setting["name"]
-        keylist = ["ori"] + [f"ef_{key}" for key in input_setting["efields"].keys()]
+    def init_name_dict(self, mlwf_setting: dict):
+        name = mlwf_setting["name"]
+        keylist = ["ori"] + [f"ef_{key}" for key in mlwf_setting["efields"].keys()]
         self.name_dict = {
             key: f"{name}_{key}" for key in keylist
         }

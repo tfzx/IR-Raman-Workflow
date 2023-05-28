@@ -21,14 +21,14 @@ class PrepareCP(Prepare):
         super().__init__()
     
     def init_inputs(self, 
-                    input_setting: Dict[str, Union[str, dict]], 
+                    mlwf_setting: Dict[str, Union[str, dict]], 
                     confs: dpdata.System,
                     wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
-        self.name = input_setting["name"]
-        qe_params = complete_by_default(input_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
+        self.name = mlwf_setting["name"]
+        qe_params = complete_by_default(mlwf_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS)
         input_cp, _ = complete_qe(qe_params, "cp-wf", None, confs)
-        self.cp_writer = QeParamsConfs(input_cp, None, input_setting["dft_params"]["atomic_species"], confs)
-        return input_setting
+        self.cp_writer = QeParamsConfs(input_cp, None, mlwf_setting["dft_params"]["atomic_species"], confs)
+        return mlwf_setting
 
     def prep_one_frame(self, frame: int):
         Path(f"cp_{self.name}.in").write_text(self.cp_writer.write(frame))
@@ -49,9 +49,9 @@ class RunCPWF(RunMLWF):
 
 class CollectCPWF(CollectWFC):
     a0 = 0.5291772083
-    def init_params(self, input_setting: dict, conf_sys: dpdata.System, example_file: Path):
-        self.prefix = input_setting["dft_params"]["qe_params"]["control"]["prefix"]
-        super().init_params(input_setting, conf_sys, example_file)
+    def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):
+        self.prefix = mlwf_setting["dft_params"]["qe_params"]["control"]["prefix"]
+        super().init_params(mlwf_setting, conf_sys, example_file)
 
     def get_num_wann(self, file_path: Path) -> int:
         start = False

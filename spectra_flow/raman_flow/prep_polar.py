@@ -25,13 +25,13 @@ class PrepPolar(OP, abc.ABC):
     def get_input_sign(cls):
         return OPIOSign({
             "polar_setting": BigParameter(dict),
-            "input_setting": BigParameter(dict)
+            "mlwf_setting": BigParameter(dict)
         })
 
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "input_setting": BigParameter(dict)
+            "mlwf_setting": BigParameter(dict)
         })
 
     @OP.exec_sign_check
@@ -39,13 +39,13 @@ class PrepPolar(OP, abc.ABC):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        input_setting: Dict[str, Union[str, dict]] = op_in["input_setting"]
+        mlwf_setting: Dict[str, Union[str, dict]] = op_in["mlwf_setting"]
         polar_setting: dict = op_in["polar_setting"]
-        input_setting["with_efield"] = True
-        input_setting["ef_type"] = polar_setting.get("ef_type", "enthalpy")
+        mlwf_setting["with_efield"] = True
+        mlwf_setting["ef_type"] = polar_setting.get("ef_type", "enthalpy")
         eps = polar_setting["eps_efield"]
         if polar_setting["central_diff"]:
-            input_setting["efields"] = {
+            mlwf_setting["efields"] = {
                 "xp": [eps, 0.0, 0.0],
                 "xm": [-eps, 0.0, 0.0],
                 "yp": [0.0, eps, 0.0],
@@ -54,11 +54,11 @@ class PrepPolar(OP, abc.ABC):
                 "zm": [0.0, 0.0, -eps]
             }
         else:
-            input_setting["efields"] = {
+            mlwf_setting["efields"] = {
                 "x": [eps, 0.0, 0.0],
                 "y": [0.0, eps, 0.0],
                 "z": [0.0, 0.0, eps]
             }
         return OPIO({
-            "input_setting": input_setting
+            "mlwf_setting": mlwf_setting
         })
