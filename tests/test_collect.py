@@ -1,4 +1,4 @@
-from spectra_flow.mlwf.collect_wfc_op import CollectWFC
+from spectra_flow.mlwf.mlwf_ops import CollectWFC
 from pathlib import Path
 import numpy as np
 

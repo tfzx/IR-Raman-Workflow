@@ -1,9 +1,7 @@
 from typing import Dict, List, Union
 from pathlib import Path
 import dpdata, numpy as np
-from spectra_flow.mlwf.prepare_input_op import Prepare
-from spectra_flow.mlwf.run_mlwf_op import RunMLWF
-from spectra_flow.mlwf.collect_wfc_op import CollectWFC
+from spectra_flow.mlwf.mlwf_ops import Prepare, RunMLWF, CollectWFC
 from spectra_flow.mlwf.inputs import QeParamsConfs, complete_qe
 from spectra_flow.utils import complete_by_default
 

@@ -1,6 +1,5 @@
 from typing import Dict, List, Tuple, Union
-from spectra_flow.mlwf.prepare_input_op import Prepare
-from spectra_flow.mlwf.run_mlwf_op import RunMLWF
+from spectra_flow.mlwf.mlwf_ops import Prepare, RunMLWF
 from pathlib import Path
 import dpdata, os
 
