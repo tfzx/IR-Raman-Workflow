@@ -1,6 +1,6 @@
 import time, matplotlib.pyplot as plt, numpy as np
 from dflow import Workflow, download_artifact
-from spectra_flow.ir_flow.ir import build_ir
+from spectra_flow.ir_flow.ir2 import build_ir
 from spectra_flow.utils import bohrium_login, load_json
 from pathlib import Path
 
@@ -16,7 +16,7 @@ if __name__ == "__main__":
         "start_steps": "train",
         "end_steps": "train"
     }
-    ir_step = build_ir(load_json("parameters.json"), load_json("../machine.json"), run_config)
+    ir_step = build_ir("ir-example3", load_json("parameters.json"), load_json("../machine.json"), run_config)
     wf = Workflow("ir-workflow")
     wf.add(ir_step)
     wf.submit()

@@ -16,7 +16,7 @@ if __name__ == "__main__":
         "start_steps": "predict",
         "end_steps": "cal_ir"
     }
-    ir_step = build_ir("ex1", load_json("parameters.json"), load_json("../machine.json"), run_config)
+    ir_step = build_ir("ir-example1", load_json("parameters.json"), load_json("../machine.json"), run_config)
 
     wf = Workflow("ir-workflow")
     wf.add(ir_step)
