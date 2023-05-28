@@ -54,7 +54,7 @@ def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False)
         if end_i < start_i:
             raise AssertionError(f"Cannot start at {run_config['start_steps']}")
         run_list = [IRflow.main_steps[i] for i in range(start_i, end_i + 1)]
-        if not run_config.get("provide_sample", False):
+        if "predict" in run_list and (not run_config.get("provide_sample", False)):
             run_list += ["md"]
     else:
         if "end_steps" in run_config:
