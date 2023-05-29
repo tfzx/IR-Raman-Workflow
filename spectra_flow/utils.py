@@ -134,13 +134,17 @@ def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.nd
         write_to_diagonal(distance, np.inf, offset = 0, axis1 = -2, axis2 = -1)
     return np.argsort(distance, axis = -1)[..., :k]
 
+def inv_cells(cells: np.ndarray):
+    inv_cells = np.zeros_like(cells)
+    inv_cells[..., :, 0] = np.cross(cells[..., 1, :], cells[..., 2, :])
+    inv_cells[..., :, 1] = np.cross(cells[..., 2, :], cells[..., 0, :])
+    inv_cells[..., :, 2] = np.cross(cells[..., 0, :], cells[..., 1, :])
+    vol = np.sum(inv_cells[..., :, 0] * cells[..., 0, :], axis = -1)
+    inv_cells /= vol[..., np.newaxis, np.newaxis]
+    return inv_cells
+
 def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
-    recip_cell = np.zeros_like(cells)
-    recip_cell[..., :, 0] = np.cross(cells[..., 1, :], cells[..., 2, :])
-    recip_cell[..., :, 1] = np.cross(cells[..., 2, :], cells[..., 0, :])
-    recip_cell[..., :, 2] = np.cross(cells[..., 0, :], cells[..., 1, :])
-    vol = np.sum(recip_cell[..., :, 0] * cells[..., 0, :], axis = -1)
-    recip_cell /= vol[..., np.newaxis, np.newaxis]
+    recip_cell = inv_cells(cells)
     return np.sum(coords[..., np.newaxis] * recip_cell, axis = -2)
 
 def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
