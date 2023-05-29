@@ -28,6 +28,16 @@ def complete_by_default(params: dict, params_default: dict, if_copy: bool = Fals
                 params[key] = params_default[key]
     return params
 
+def recurcive_update(dict1: dict, dict2: dict):
+    for key in dict2:
+        if isinstance(dict2[key], dict):
+            if key not in dict1:
+                dict1[key] = {}
+            if isinstance(dict1[key], dict):
+                recurcive_update(dict1[key], dict2[key])
+        else:
+            dict1[key] = dict2[key]
+
 def load_json(path: Union[str, Path]):
     with open(path, "r") as f:
         setting = json.load(f)
