@@ -65,17 +65,27 @@ class PrepareQeWann(Prepare):
 
     def complete_ef(self, qe_params: Dict[str, dict], efield: Optional[List[float]], ef_type: str = "enthalpy", is_ori: bool = True):
         params = deepcopy(qe_params)
-        params["control"].update({
-            "restart_mode": "from_scratch" if is_ori else "restart",
-            "lelfield": not is_ori
-        })
-        if not efield:
-            efield = [0.0, 0.0, 0.0]
-        params["electrons"].update({
-            "efield_cart(1)": efield[0],
-            "efield_cart(2)": efield[1],
-            "efield_cart(3)": efield[2]
-        })
+        ef_type = ef_type.lower()
+        if ef_type == "enthalpy":
+            params["control"]["restart_mode"] = "from_scratch" if is_ori else "restart"
+            params["control"]["lelfield"] = not is_ori
+            if not efield:
+                efield = [0.0, 0.0, 0.0]
+            params["electrons"].update({
+                "efield_cart(1)": efield[0],
+                "efield_cart(2)": efield[1],
+                "efield_cart(3)": efield[2]
+            })
+        elif ef_type == "saw":
+            params["control"]["restart_mode"] = "from_scratch"
+            params["control"]["tefield"] = not is_ori
+            if not efield:
+                efield = [3, 0.0]
+            edir, eamp = efield[:2]
+            params["system"].update({
+                "edir": edir,
+                "eamp": eamp
+            })
         return params
 
     def get_qe_inputs(
@@ -223,11 +233,13 @@ class RunQeWann(RunMLWF):
 
         efields: Dict[str, List[float]] = self.mlwf_setting.get("efields", None)
         with_ef = self.mlwf_setting.get("with_efield", False) and bool(efields)
+        if with_ef:
+            ef_type = self.mlwf_setting["ef_type"]
 
         with set_directory(ori_p):
             self.run(" ".join([self.wannier_cmd, "-pp", f"{self.name}_ori"]))
             self.run(" ".join([self.pw_cmd, "-input", "scf_ori.in"]))
-            if with_ef:
+            if with_ef and ef_type == "enthalpy":
                 shutil.copytree(out_dir, ori_out_dir)
             if Path("nscf_ori.in").exists():
                 self.run(" ".join([self.pw_cmd, "-input", "nscf_ori.in"]))
@@ -239,7 +251,8 @@ class RunQeWann(RunMLWF):
             for ef_name in self.mlwf_setting["efields"]:
                 key = f"ef_{ef_name}"
                 with set_directory(key):
-                    shutil.copytree(ori_out_dir, out_dir)
+                    if ef_type == "enthalpy":
+                        shutil.copytree(ori_out_dir, out_dir)
                     self.run(" ".join([
                         self.wannier_cmd, "-pp", f"{self.name}_{key}"
                     ]))

@@ -122,9 +122,11 @@ class PolarSteps(BasicSteps):
                 python_packages = upload_python_packages
             ),
             parameters = {
-                "polar_setting": polar_setting
+                "polar_setting": polar_setting,
+                "conf_fmt": conf_fmt
             },
             artifacts = {
+                "confs": confs_artifact,
                 "wannier_centroid": dipole_step.outputs.artifacts["wannier_centroid"]
             },
             executor = cal_executor

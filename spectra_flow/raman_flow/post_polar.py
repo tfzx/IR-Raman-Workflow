@@ -11,6 +11,7 @@ from dflow.python import (
 from dflow.utils import (
     set_directory
 )
+from spectra_flow.utils import read_conf, inv_cells
 
 class PostPolar(OP):
     def __init__(self) -> None:
@@ -20,6 +21,8 @@ class PostPolar(OP):
     def get_input_sign(cls):
         return OPIOSign({
             "polar_setting": BigParameter(dict),
+            "confs": Artifact(Path),
+            "conf_fmt": BigParameter(dict),
             "wannier_centroid": Artifact(Dict[str, Path]),
         })
 
@@ -37,19 +40,20 @@ class PostPolar(OP):
         polar_setting: Dict[str, Union[str, dict]] = op_in["polar_setting"]
         eps = polar_setting["eps_efield"]
         c_diff = polar_setting["central_diff"]
+        confs = read_conf(op_in["confs"], op_in["conf_fmt"])
         wc_dict: Dict[str, np.ndarray] = {}
         for key, p in op_in["wannier_centroid"].items():
             arr = np.loadtxt(p, dtype = float, ndmin = 2)
             wc_dict[key] = arr.reshape(arr.shape[0], -1, 3)
-
-        polar = self.cal_polar(c_diff, eps, wc_dict)
+        ef_type = polar_setting.get("ef_type", "enthalpy").lower()
+        polar = self.cal_polar(c_diff, eps, ef_type, confs, wc_dict)
         polar_path = Path("polarizability.raw")
-        np.savetxt(polar_path, polar, fmt = "%15.8f")
+        np.savetxt(polar_path, polar)
         return OPIO({
             "polarizability": polar_path
         })
     
-    def cal_polar(self, c_diff: bool, eps: float, wc_dict: Dict[str, np.ndarray]) -> np.ndarray:
+    def cal_polar(self, c_diff: bool, eps: float, ef_type: str, confs: dpdata.System, wc_dict: Dict[str, np.ndarray]) -> np.ndarray:
         '''
         Calculate polarizability from a dictionary of wannier centroids.
 
@@ -77,11 +81,40 @@ class PostPolar(OP):
         v = next(iter(wc_dict.values()))
         polar = np.zeros((v.shape[0], v.shape[1], 3, 3), dtype = float)
         if c_diff:
-            polar[:, :, 0, :] = (wc_dict["ef_xp"] - wc_dict["ef_xm"]) / (2 * eps)
-            polar[:, :, 1, :] = (wc_dict["ef_yp"] - wc_dict["ef_ym"]) / (2 * eps)
-            polar[:, :, 2, :] = (wc_dict["ef_zp"] - wc_dict["ef_zm"]) / (2 * eps)
+            if ef_type == "enthalpy":
+                keys = [
+                    ["ef_xp", "ef_xm"],
+                    ["ef_yp", "ef_ym"],
+                    ["ef_zp", "ef_zm"],
+                ]
+            elif ef_type == "saw":
+                keys = [
+                    ["ef_d1p", "ef_d1m"],
+                    ["ef_d2p", "ef_d2m"],
+                    ["ef_d3p", "ef_d3m"],
+                ]
+            delta = 2 * eps
         else:
-            polar[:, :, 0, :] = (wc_dict["ef_x"] - wc_dict["ori"]) / eps
-            polar[:, :, 1, :] = (wc_dict["ef_y"] - wc_dict["ori"]) / eps
-            polar[:, :, 2, :] = (wc_dict["ef_z"] - wc_dict["ori"]) / eps
+            if ef_type == "enthalpy":
+                keys = [
+                    ["ef_x", "ori"],
+                    ["ef_y", "ori"],
+                    ["ef_z", "ori"],
+                ]
+            elif ef_type == "saw":
+                keys = [
+                    ["ef_d1", "ori"],
+                    ["ef_d2", "ori"],
+                    ["ef_d3", "ori"],
+                ]
+            delta = eps
+        for dir in range(3):
+            try:
+                polar[:, :, dir, :] = (wc_dict[keys[dir][0]] - wc_dict[keys[dir][1]]) / delta
+            except KeyError:
+                pass
+        if ef_type == "saw":
+            cells = confs["cells"]
+            cells = cells / np.linalg.norm(cells, ord = 2, axis = -1, keepdims = True)
+            polar = np.matmul(inv_cells(cells)[..., np.newaxis, :, :], polar)
         return polar.reshape(polar.shape[0], -1)
