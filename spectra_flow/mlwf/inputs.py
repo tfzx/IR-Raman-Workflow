@@ -135,6 +135,9 @@ class QeParams(QeInputs):
 def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int, int, int]):
     wan_params = deepcopy(wan_params)
     wan_params["mp_grid"] = "{}, {}, {}".format(*k_grid)
+    if "num_bands" in wan_params and "num_wann" in wan_params and "select_projections" not in wan_params:
+        if wan_params["num_wann"] < wan_params["num_bands"]:
+            wan_params["select_projections"] = f"1-{wan_params['num_wann']}"
     if proj and len(proj) == 0:
         proj = None
     kpoints = kmesh(*k_grid)[:, :3]
