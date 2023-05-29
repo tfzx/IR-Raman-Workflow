@@ -6,7 +6,7 @@ from dflow import (
     download_artifact
 )
 from spectra_flow.raman_flow.polar_steps import PolarSteps
-from spectra_flow.mlwf.ef_qe_wann import PrepareEfQeWann, RunEfQeWann, CollectEfWann
+from spectra_flow.mlwf.qe_wannier90 import PrepareQeWann, RunQeWann, CollectWann
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 from spectra_flow.utils import load_json, bohrium_login, get_executor
 
@@ -22,9 +22,9 @@ if __name__ == "__main__":
 
     mlwf_template = MLWFSteps(
         name = "MLWF-Qe",
-        prepare_op = PrepareEfQeWann, # use OPs in mlwf.qe_wannier90
-        run_op = RunEfQeWann,
-        collect_op = CollectEfWann,
+        prepare_op = PrepareQeWann, # use OPs in mlwf.qe_wannier90
+        run_op = RunQeWann,
+        collect_op = CollectWann,
         prepare_executor = base_executor,
         run_executor = run_executor
     )

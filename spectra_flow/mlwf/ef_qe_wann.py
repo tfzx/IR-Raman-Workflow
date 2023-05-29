@@ -17,6 +17,9 @@ from copy import deepcopy
 from dflow.utils import set_directory
 
 class PrepareEfQeWann(Prepare):
+    """
+    ** Deprecated. Use qe_wannier90 instead. **
+    """
     DEFAULT_PARAMS = {
         "control": {
             "prefix"        : "h2o",
@@ -106,6 +109,9 @@ class PrepareEfQeWann(Prepare):
 
 
 class RunEfQeWann(RunMLWF):
+    """
+    ** Deprecated. Use qe_wannier90 instead. **
+    """
     def __init__(self) -> None:
         super().__init__()
 
@@ -150,6 +156,9 @@ class RunEfQeWann(RunMLWF):
 
 
 class CollectEfWann(CollectWann):
+    """
+    ** Deprecated. Use qe_wannier90 instead. **
+    """
     def init_name_dict(self, mlwf_setting: dict):
         name = mlwf_setting["name"]
         keylist = ["ori"] + [f"ef_{key}" for key in mlwf_setting["efields"].keys()]

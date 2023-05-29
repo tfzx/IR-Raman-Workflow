@@ -122,7 +122,7 @@ class RunMLWF(OP, abc.ABC):
     ) -> OPIO:
         task_path: Path = op_in["task_path"]
         self.name: str = op_in["mlwf_setting"]["name"]
-        self.mlwf_setting = op_in["mlwf_setting"]
+        self.mlwf_setting: dict = op_in["mlwf_setting"]
         task_setting: dict = op_in["task_setting"]
         self.backward_list: List[str] = task_setting["backward_list"]
         self.backward_dir_name: str = task_setting["backward_dir_name"]

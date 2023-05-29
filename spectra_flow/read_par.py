@@ -26,8 +26,6 @@ _default_par = {
 
 def _default(parameters: dict):
     complete_by_default(parameters, _default_par)
-    if "dipole" in parameters["config"]:
-        complete_by_default(parameters["config"]["dipole"]["mlwf_setting"], {"name": parameters["config"]["global"]["name"]})
 
 def read_par(parameters: Dict[str, dict]):
     _default(parameters)
@@ -57,8 +55,8 @@ def read_par(parameters: Dict[str, dict]):
 
     file_config_list = [
         ("dp_setting", "train_inputs"),
-        ("mlwf_setting"),
-        ("task_setting")
+        ("mlwf_setting", ),
+        ("task_setting", )
     ]
     for keys in file_config_list:
         config_from_file(inputs, keys)
@@ -93,6 +91,8 @@ def config_from_file(inputs: dict, keys: Tuple[str]):
         else:
             inputs = inputs[key]
     last_key = keys[-1]
+    if not last_key in inputs:
+        return
     if isinstance(inputs[last_key], str):
         inputs[last_key] = load_json(inputs[last_key])
     elif isinstance(inputs[last_key], list):
