@@ -34,16 +34,18 @@ class PrepareCP(Prepare):
         Path(f"cp_{self.name}.in").write_text(self.cp_writer.write(frame))
 
 class RunCPWF(RunMLWF):
+    DEFAULT_BACK = ["*/*.wfc"]
     def __init__(self) -> None:
         super().__init__()
     
-    def init_cmd(self, commands: Dict[str, str]):
+    def init_cmd(self, mlwf_setting: Dict[str, Union[str, dict]], commands: Dict[str, str]):
         self.cp_cmd = commands.get("cp", "cp.x")
+        self.name = mlwf_setting["name"]
         return super().init_cmd(commands)
 
-    def run_one_frame(self) -> Path:
+    def run_one_frame(self, backward_dir_name: str) -> Path:
         self.run(" ".join([self.cp_cmd, "-input", f"cp_{self.name}.in"]))
-        backward_dir = Path(self.backward_dir_name)
+        backward_dir = Path(backward_dir_name)
         backward_dir.mkdir()
         return backward_dir
 
@@ -51,7 +53,10 @@ class CollectCPWF(CollectWFC):
     a0 = 0.5291772083
     def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):
         self.prefix = mlwf_setting["dft_params"]["qe_params"]["control"]["prefix"]
-        super().init_params(mlwf_setting, conf_sys, example_file)
+        try:
+            self.num_wann = mlwf_setting["num_wann"]
+        except KeyError:
+            self.num_wann = self.get_num_wann(conf_sys, example_file)
 
     def get_num_wann(self, file_path: Path) -> int:
         start = False
@@ -70,7 +75,7 @@ class CollectCPWF(CollectWFC):
                     num_wann += 1
         return num_wann
 
-    def get_one_frame(self, frame: int) -> Dict[str, np.ndarray]:
+    def get_one_frame(self) -> Dict[str, np.ndarray]:
         with open(f"{self.prefix}.wfc", "r") as fp:
             while fp.readline().strip():
                 wann = np.loadtxt(fp, dtype = float, max_rows = self.num_wann)

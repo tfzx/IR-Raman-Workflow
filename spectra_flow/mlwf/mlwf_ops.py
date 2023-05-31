@@ -97,6 +97,7 @@ class Prepare(OP, abc.ABC):
         pass
 
 class RunMLWF(OP, abc.ABC):
+    DEFAULT_BACK = []
     def __init__(self) -> None:
         super().__init__()
     
@@ -121,35 +122,34 @@ class RunMLWF(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         task_path: Path = op_in["task_path"]
-        self.name: str = op_in["mlwf_setting"]["name"]
-        self.mlwf_setting: dict = op_in["mlwf_setting"]
+        mlwf_setting: dict = op_in["mlwf_setting"]
         task_setting: dict = op_in["task_setting"]
-        self.backward_list: List[str] = task_setting["backward_list"]
-        self.backward_dir_name: str = task_setting["backward_dir_name"]
+        backward_list: List[str] = list(set(task_setting["backward_list"] + self.DEFAULT_BACK))
+        backward_dir_name: str = task_setting["backward_dir_name"]
         commands: Dict[str, str] = task_setting["commands"]
         start_f, end_f = op_in["frames"]
 
         confs_path = [Path(f"conf.{f:06d}") for f in range(start_f, end_f)]
         self.log_path = Path("run.log").absolute()
 
-        self.init_cmd(commands)
-        backward = self._exec_all(task_path, confs_path)
+        self.init_cmd(mlwf_setting, commands)
+        backward = self._exec_all(task_path, confs_path, backward_list, backward_dir_name)
         return OPIO({
             "backward": backward
         })
     
-    def _exec_all(self, task_path: Path, confs_path: List[Path]):
+    def _exec_all(self, task_path: Path, confs_path: List[Path], backward_list: List[str], backward_dir_name: str):
         backward: List[Path] = []
         with set_directory(task_path):
             for p in confs_path:
                 with set_directory(p):
-                    backward_dir = self.run_one_frame()
-                    self._collect(backward_dir)
+                    backward_dir = self.run_one_frame(backward_dir_name)
+                    self._collect(backward_dir, backward_list)
                     backward.append(task_path / p / backward_dir)
         return backward
 
-    def _collect(self, backward_dir: Path):
-        for f in self.backward_list:
+    def _collect(self, backward_dir: Path, backward_list: List[str]):
+        for f in backward_list:
             for p in Path(".").glob(f):
                 print(p.name)
                 if p.is_file():
@@ -160,7 +160,7 @@ class RunMLWF(OP, abc.ABC):
 
     def run(self, *args, **kwargs):
         kwargs["print_oe"] = True
-        kwargs["raise_error"] = True
+        kwargs["raise_error"] = False
         ret, out, err = run_command(*args, **kwargs)
         # if ret != 0:
         #     print(out)
@@ -171,11 +171,11 @@ class RunMLWF(OP, abc.ABC):
             fp.write(out)
 
     @abc.abstractmethod
-    def init_cmd(self, commands: Dict[str, str]):
+    def init_cmd(self, mlwf_setting: Dict[str, Union[str, dict]], commands: Dict[str, str]):
         pass
 
     @abc.abstractmethod
-    def run_one_frame(self) -> Path:
+    def run_one_frame(self, backward_dir_name: str) -> Path:
         pass
 
 class CollectWFC(OP, abc.ABC):
@@ -222,7 +222,7 @@ class CollectWFC(OP, abc.ABC):
                 total_wfc[key][frame] = wfc_arr.flatten()
         for frame, p in enumerate(backward):
             with set_directory(p):
-                update_wfc(self.get_one_frame(frame), frame)
+                update_wfc(self.get_one_frame(), frame)
         wfc_path: Dict[str, Path] = {}
         for key, wfc in total_wfc.items():
             wfc_path[key] = Path(f"wfc_{key}.raw")
@@ -231,16 +231,9 @@ class CollectWFC(OP, abc.ABC):
 
 
     @abc.abstractmethod
-    def get_one_frame(self, frame: int) -> Dict[str, np.ndarray]:
+    def get_one_frame(self) -> Dict[str, np.ndarray]:
         pass
 
     @abc.abstractmethod
     def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):
-        try:
-            self.num_wann = mlwf_setting["num_wann"]
-        except KeyError:
-            self.num_wann = self.get_num_wann(conf_sys, example_file)
-
-    @abc.abstractmethod
-    def get_num_wann(self, conf_sys: dpdata.System, example_file: Path) -> int:
         pass
