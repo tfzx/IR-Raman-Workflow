@@ -111,7 +111,8 @@ def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.nd
         Parameters
         -------------
             coords_A (..., num_A, d): the coordinates of the central points. The size of the last axis is the dimension.
-            coords_B (..., num_B, d): the coordinates of the points to be selected.
+            coords_B (..., num_B, d): the coordinates of the points to be selected. 
+            If B is None, A will be compared with itself, where the diagonal will be removed.
             box      (..., d): the PBC box. box[..., i] is the length of period along x_i.
             k: int, the number of the points selected from coords_B.
 
