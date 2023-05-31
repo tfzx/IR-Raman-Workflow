@@ -1,10 +1,10 @@
-from typing import Dict, Optional, Tuple, Union, Callable
+from typing import Dict, List, Optional, Tuple, Union, Callable
 import numpy as np
 from copy import deepcopy
 from tempfile import TemporaryFile
 import dpdata
 import abc
-from spectra_flow.utils import kmesh, complete_by_default
+from spectra_flow.utils import kmesh, complete_by_default, recurcive_update
 
 class QeInputs(abc.ABC):
     def __init__(self) -> None:
@@ -71,35 +71,6 @@ class QeInputs(abc.ABC):
             params_str = f.read()
         return params_str
 
-def complete_qe(input_params: Dict[str, dict], calculation: Optional[str] = None, 
-                k_grid: Optional[Tuple[int, int, int]] = None, 
-                confs: Optional[dpdata.System] = None):
-    input_params_default: Dict[str, dict] = {}
-    if calculation:
-        input_params_default["control"] = {
-            "calculation"   : calculation
-        }
-    if confs:
-        input_params_default["system"] = {
-            "ntyp"  : len(confs["atom_names"]),
-            "nat"   : confs.get_natoms()
-        }
-    input_params = complete_by_default(input_params, input_params_default, if_copy = True)
-    kpoints = None
-    if k_grid:
-        calculation = input_params["control"]["calculation"]
-        if calculation == "scf":
-            kpoints = {
-                "type": "automatic",
-                "k_grid": k_grid
-            }
-        else:
-            kpoints = {
-                "type": "crystal",
-                "k_points": kmesh(*k_grid)
-            }
-    return input_params, kpoints
-
 class QeParamsConfs(QeInputs):
     def __init__(self, input_params: Dict[str, dict], kpoints: Dict[str, Union[str, np.ndarray]], 
                  atomic_species: dict, confs: dpdata.System, optional_input: str = None) -> None:
@@ -115,15 +86,6 @@ class QeParamsConfs(QeInputs):
     def write(self, frame: int):
         return "\n".join([self.params_str, self.write_configuration(self.confs[frame], self.atoms)])
 
-def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlwf", outdir: str = "out"):
-    input_params = deepcopy(input_params)
-    input_params["inputpp"].update({
-        "outdir" : outdir,
-        "prefix" : prefix,
-        "seedname" : name,
-    })
-    return input_params
-
 class QeParams(QeInputs):
     def __init__(self, input_params: Dict[str, dict]) -> None:
         super().__init__()
@@ -131,17 +93,6 @@ class QeParams(QeInputs):
     
     def write(self, frame: int):
         return self.params_str
-
-def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int, int, int]):
-    wan_params = deepcopy(wan_params)
-    wan_params["mp_grid"] = "{}, {}, {}".format(*k_grid)
-    if "num_bands" in wan_params and "num_wann" in wan_params and "select_projections" not in wan_params:
-        if wan_params["num_wann"] < wan_params["num_bands"]:
-            wan_params["select_projections"] = f"1-{wan_params['num_wann']}"
-    if proj and len(proj) == 0:
-        proj = None
-    kpoints = kmesh(*k_grid)[:, :3]
-    return wan_params, proj, kpoints
 
 class Wannier90Inputs:
     def __init__(
@@ -230,3 +181,145 @@ class Wannier90Inputs:
             f.seek(0)
             proj_str = f.read()
         return proj_str
+
+
+
+
+def complete_qe(input_params: Dict[str, dict], calculation: Optional[str] = None, 
+                k_grid: Optional[Tuple[int, int, int]] = None, 
+                confs: Optional[dpdata.System] = None):
+    input_params_default: Dict[str, dict] = {}
+    if calculation:
+        input_params_default["control"] = {
+            "calculation"   : calculation
+        }
+    if confs:
+        input_params_default["system"] = {
+            "ntyp"  : len(confs["atom_names"]),
+            "nat"   : confs.get_natoms()
+        }
+    input_params = complete_by_default(input_params, input_params_default, if_copy = True)
+    kpoints = None
+    if k_grid:
+        calculation = input_params["control"]["calculation"]
+        if calculation == "scf":
+            kpoints = {
+                "type": "automatic",
+                "k_grid": k_grid
+            }
+        else:
+            kpoints = {
+                "type": "crystal",
+                "k_points": kmesh(*k_grid)
+            }
+    return input_params, kpoints
+
+def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlwf", outdir: str = "out"):
+    input_params = deepcopy(input_params)
+    input_params["inputpp"].update({
+        "outdir" : outdir,
+        "prefix" : prefix,
+        "seedname" : name,
+    })
+    return input_params
+
+def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int, int, int]):
+    wan_params = deepcopy(wan_params)
+    wan_params["mp_grid"] = "{}, {}, {}".format(*k_grid)
+    if "num_bands" in wan_params and "num_wann" in wan_params and "select_projections" not in wan_params:
+        if wan_params["num_wann"] < wan_params["num_bands"]:
+            wan_params["select_projections"] = f"1-{wan_params['num_wann']}"
+    if proj and len(proj) == 0:
+        proj = None
+    kpoints = kmesh(*k_grid)[:, :3]
+    return wan_params, proj, kpoints
+
+
+
+
+def get_qe_writers(
+        confs: dpdata.System,
+        scf_grid: List[int],
+        nscf_grid: List[int],
+        scf_params: Dict[str, dict],
+        nscf_params: Optional[Dict[str, dict]],
+        atomic_species: Dict[str, Dict[str, Union[str, float]]],
+        run_nscf: bool = True
+    ):
+    input_scf, kpoints_scf = complete_qe(scf_params, "scf", scf_grid, confs)
+    scf_writer = QeParamsConfs(input_scf, kpoints_scf, atomic_species, confs)
+    nscf_writer = None; input_nscf = None
+    if run_nscf:
+        _nscf_params = deepcopy(scf_params)
+        if nscf_params is not None:
+            recurcive_update(_nscf_params, nscf_params)
+        _nscf_params["control"]["restart_mode"] = "from_scratch"
+        input_nscf, kpoints_nscf = complete_qe(_nscf_params, "nscf", nscf_grid, confs)
+        nscf_writer = QeParamsConfs(input_nscf, kpoints_nscf, atomic_species, confs)
+    return scf_writer, nscf_writer, input_scf, input_nscf
+
+def get_pw_w90_writers(
+        seed_name: str,
+        confs: dpdata.System,
+        pw2wan_params: Dict[str, dict], 
+        w90_params: Dict[str, dict],
+        kgrid: List[int],
+        input_scf: Dict[str, dict], 
+        input_nscf: Optional[Dict[str, dict]],
+        rewrite_atoms: Callable[[dpdata.System], np.ndarray],
+        rewrite_proj: Callable[[dpdata.System], Dict[str, str]]
+    ):
+    pw2wan_writer = get_pw2wan_writer(seed_name, pw2wan_params, input_scf)
+    w90_writer = get_w90_writer(confs, w90_params, input_scf, input_nscf, kgrid, rewrite_atoms, rewrite_proj)
+    return pw2wan_writer, w90_writer
+
+def get_pw2wan_writer(
+        seed_name: str,
+        pw2wan_params: Dict[str, dict], 
+        input_scf: Dict[str, dict], 
+    ):
+    input_pw2wan = complete_pw2wan(
+        pw2wan_params, 
+        seed_name, 
+        input_scf["control"]["prefix"],
+        input_scf["control"]["outdir"]
+    )
+    return QeParams(input_pw2wan)
+
+def get_w90_writer(
+        confs: dpdata.System,
+        w90_params: Dict[str, dict],
+        scf_params: Dict[str, dict],
+        nscf_params: Optional[Dict[str, dict]],
+        kgrid: List[int],
+        rewrite_atoms: Callable[[dpdata.System], np.ndarray],
+        rewrite_proj: Callable[[dpdata.System], Dict[str, str]]
+    ):
+    wan_params = w90_params["wan_params"]
+    if nscf_params is not None:
+        if "system" in nscf_params and "nbnd" in nscf_params["system"]:
+            wan_params["num_bands"] = nscf_params["system"]["nbnd"]
+    else:
+        if "system" in scf_params and "nbnd" in scf_params["system"]:
+            wan_params["num_bands"] = scf_params["system"]["nbnd"]
+    wan_params, proj, kpoints = complete_wannier90(
+        wan_params, 
+        w90_params.get("projections", {}),
+        kgrid
+    )
+    if w90_params.get("rewrite_atoms", False):
+        if rewrite_atoms is None:
+            print(f"[WARNING] 'rewrite_atoms' is True but cannot importing the method!")
+            print("Use default atom names.")
+    else:
+        rewrite_atoms = None
+    if w90_params.get("rewrite_proj", False):
+        if rewrite_proj is None:
+            print(f"[WARNING] 'rewrite_proj' is True but cannot importing the method!")
+            print("Use projections defined in wannier90_params.")
+    else:
+        rewrite_proj = None
+    return Wannier90Inputs(
+        wan_params, proj, kpoints, 
+        confs, rewrite_atoms, rewrite_proj
+    )
