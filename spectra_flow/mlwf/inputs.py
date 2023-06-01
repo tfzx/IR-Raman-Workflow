@@ -226,10 +226,18 @@ def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlw
 def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int, int, int]):
     wan_params = deepcopy(wan_params)
     wan_params["mp_grid"] = "{}, {}, {}".format(*k_grid)
-    if "num_bands" in wan_params and "num_wann" in wan_params and "select_projections" not in wan_params:
-        if wan_params["num_wann"] < wan_params["num_bands"]:
-            wan_params["select_projections"] = f"1-{wan_params['num_wann']}"
-    if proj and len(proj) == 0:
+    if "num_bands" in wan_params and "num_wann" in wan_params:
+        if wan_params["num_wann"] > wan_params["num_bands"]:
+            raise RuntimeError(
+                f"num_wann = {wan_params['num_wann']}, which is greater than num_bands = {wan_params['num_bands']}"
+            )
+        # elif wan_params["num_wann"] < wan_params["num_bands"] and "select_projections" not in wan_params:
+        #     print("*" * 10)
+        #     print("[WARNING] num_wann < num_bands, but select_projections were not given!")
+        #     print(f"[WARNING] Select 1-{wan_params['num_wann']} by default!")
+        #     print("*" * 10)
+            # wan_params["select_projections"] = f"1-{wan_params['num_wann']}"
+    if proj is not None and len(proj) == 0:
         proj = None
     kpoints = kmesh(*k_grid)[:, :3]
     return wan_params, proj, kpoints
