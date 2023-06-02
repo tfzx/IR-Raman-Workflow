@@ -62,5 +62,5 @@ if __name__ == "__main__":
     assert(wf.query_status() == "Succeeded")
 
     step = wf.query_step("Dipole-Step")[0]
-    download_artifact(step.outputs.artifacts["wannier_function_centers"], path="./back")
-    download_artifact(step.outputs.artifacts["wannier_centroid"], path="./back")
+    for key in dipole_template.output_artifacts:
+        download_artifact(step.outputs.artifacts[key], path="./back")
