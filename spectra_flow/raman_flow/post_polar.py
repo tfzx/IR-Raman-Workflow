@@ -112,6 +112,8 @@ class PostPolar(OP):
             try:
                 polar[:, :, dir, :] = (wc_dict[keys[dir][0]] - wc_dict[keys[dir][1]]) / delta
             except KeyError:
+                print(f"[WARNING] An error occured while calculating the polarizability along dir {dir}!")
+                print("[WARNING] Set the polarizability to 0.")
                 pass
         if ef_type == "saw":
             cells: np.ndarray = confs["cells"]
