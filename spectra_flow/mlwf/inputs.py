@@ -55,7 +55,7 @@ class QeInputs(abc.ABC):
                     f.write(f"{atom} {info['mass']} {info['pseudo']}\n")
             if kpoints is not None:
                 kpoint_type: str = kpoints["type"].strip()
-                f.write("\nK_POINTS { " + kpoint_type + " }\n")
+                f.write(f"\nK_POINTS { kpoint_type }\n")
                 if kpoint_type == "crystal":
                     k_points = kpoints["k_points"]
                     f.write(f"{k_points.shape[0]}\n")
@@ -64,6 +64,8 @@ class QeInputs(abc.ABC):
                     nk1, nk2, nk3 = kpoints["k_grid"]
                     sk1, sk2, sk3 = kpoints.get("offset", (0, 0, 0))
                     f.write(f"{nk1} {nk2} {nk3} {sk1} {sk2} {sk3}\n")
+                else:
+                    raise NotImplementedError("Unsupported kpoint type!")
             if optional_input is not None:
                 f.write(optional_input)
                 f.write("\n")
@@ -72,7 +74,7 @@ class QeInputs(abc.ABC):
         return params_str
 
 class QeParamsConfs(QeInputs):
-    def __init__(self, input_params: Dict[str, dict], kpoints: Dict[str, Union[str, np.ndarray]], 
+    def __init__(self, input_params: Dict[str, dict], kpoints: dict, 
                  atomic_species: dict, confs: dpdata.System, optional_input: str = None) -> None:
         super().__init__()
         """
@@ -98,7 +100,7 @@ class Wannier90Inputs:
     def __init__(
             self, 
             wan_params: dict, 
-            proj: Optional[Dict[str, str]], 
+            proj: Optional[Union[Dict[str, str], List[str]]], 
             kpoints: np.ndarray, 
             confs: dpdata.System, 
             rewrite_atoms: Callable[[dpdata.System], np.ndarray] = None,
@@ -169,14 +171,20 @@ class Wannier90Inputs:
         return kpoints_str
 
     @classmethod
-    def write_proj(cls, proj: Dict[str, str]):
+    def write_proj(cls, proj: Union[Dict[str, str], List[str]]):
         with TemporaryFile("w+") as f:
             f.write("\nbegin projections\n")
-            if "units" in proj:
-                f.write(proj["units"] + "\n")
-                del proj["units"]
-            for site, option in proj.items():
-                f.write(f"    {site}: {option}\n")
+            if isinstance(proj, dict):
+                if "units" in proj:
+                    f.write(proj["units"] + "\n")
+                    del proj["units"]
+                for site, option in proj.items():
+                    f.write(f"    {site}: {option}\n")
+            elif isinstance(proj, list):
+                f.write("\n".join(proj))
+                f.write("\n")
+            else:
+                raise TypeError(f"Invalid type {type(proj)} for 'proj'!")
             f.write("end projections\n")
             f.seek(0)
             proj_str = f.read()
