@@ -45,6 +45,22 @@ class BasicSteps(Steps, abc.ABC):
             parallelism = parallelism
         )
     
+    @property
+    def input_parameters(self):
+        return self._input_parameters
+
+    @property
+    def input_artifacts(self):
+        return self._input_artifacts
+    
+    @property
+    def output_parameters(self):
+        return self._output_parameters
+    
+    @property
+    def output_artifacts(self):
+        return self._output_artifacts
+    
     @classmethod
     @abc.abstractmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
