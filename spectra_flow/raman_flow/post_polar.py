@@ -114,7 +114,9 @@ class PostPolar(OP):
             except KeyError:
                 pass
         if ef_type == "saw":
-            cells = confs["cells"]
-            cells = cells / np.linalg.norm(cells, ord = 2, axis = -1, keepdims = True)
-            polar = np.matmul(inv_cells(cells)[..., np.newaxis, :, :], polar)
+            cells: np.ndarray = confs["cells"]
+            cells = (cells / np.linalg.norm(cells, ord = 2, axis = -1, keepdims = True))
+            inv_c = inv_cells(cells)
+            cells = cells.transpose(0, -1, -2) * np.linalg.norm(inv_c, ord = 2, axis = -2, keepdims = True)
+            polar = np.matmul(cells[..., np.newaxis, :, :], polar)
         return polar.reshape(polar.shape[0], -1)
