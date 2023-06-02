@@ -358,3 +358,17 @@ def read_lmp_dump(dump_file: Path, BUFFER: int = 50000) -> Dict[str, np.ndarray]
         f_coords.close()
         f_types.close()
     return sys
+
+def dump_to_fmt(name: Union[str, Path], confs: Optional[dpdata.System], fmt: str, *args, in_fmt: dict = None, **kwargs):
+    if isinstance(name, str):
+        conf_path = Path(name)
+    else:
+        conf_path = name
+    if confs is None:
+        conf_path.touch()
+    else:
+        confs.to(fmt, conf_path, *args, **kwargs)
+    conf_fmt = {"fmt": fmt}
+    if in_fmt is not None and "type_map" in in_fmt:
+        conf_fmt["type_map"] = in_fmt["type_map"]
+    return conf_path, conf_fmt
