@@ -8,7 +8,10 @@ from dflow import (
     Outputs,
     InputParameter,
     InputArtifact,
-    OutputArtifact
+    OutputParameter,
+    OutputArtifact,
+    argo_sequence,
+    argo_len
 )
 from dflow.python import (
     PythonOPTemplate,
@@ -16,8 +19,32 @@ from dflow.python import (
     OP
 )
 import spectra_flow
+from spectra_flow.base_workflow import BasicSteps
 
-class MLWFSteps(Steps):
+class MLWFSteps(BasicSteps):
+    @classmethod
+    def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
+        return {
+            "mlwf_setting": InputParameter(type = dict, value = {}),
+            "task_setting": InputParameter(type = dict, value = {}),
+            "conf_fmt": InputParameter(type = dict, value = {})
+        }, {
+            "confs": InputArtifact(),
+            "pseudo": InputArtifact(),
+            "cal_dipole_python": InputArtifact(optional = True)
+        }
+    
+    @classmethod
+    def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
+        return {
+            "final_conf_fmt": OutputParameter()
+        }, {
+            "backward": OutputArtifact(),
+            "final_confs": OutputArtifact(),
+            "failed_confs": OutputArtifact(),
+            "wannier_function_centers": OutputArtifact()
+        }
+    
     def __init__(self, 
             name: str, 
             prepare_op: OP,
@@ -26,33 +53,10 @@ class MLWFSteps(Steps):
             prepare_executor: Executor,
             run_executor: Executor,
             collect_executor: Executor = None,
-            upload_python_packages: List[Union[str, Path]] = None
+            upload_python_packages: Optional[List[Union[str, Path]]] = None,
+            parallelism: Optional[int] = None
         ) -> None:
-        
-        self._input_parameters = {
-            "mlwf_setting": InputParameter(type = dict, value = {}),
-            "task_setting": InputParameter(type = dict, value = {}),
-            "conf_fmt": InputParameter(type = dict, value = {})
-        }
-        self._input_artifacts = {
-            "confs": InputArtifact(),
-            "pseudo": InputArtifact(),
-            "cal_dipole_python": InputArtifact(optional = True)
-        }
-        self._output_artifacts = {
-            "backward": OutputArtifact(),
-            "wannier_function_centers": OutputArtifact()
-        }
-        super().__init__(
-            name = name,
-            inputs = Inputs(
-                parameters = self._input_parameters,
-                artifacts = self._input_artifacts
-            ),
-            outputs = Outputs(
-                artifacts = self._output_artifacts
-            )
-        )
+        super().__init__(name)
         if not upload_python_packages:
             upload_python_packages = spectra_flow.__path__
         if not collect_executor:
@@ -64,7 +68,8 @@ class MLWFSteps(Steps):
             prepare_executor,
             run_executor,
             collect_executor,
-            upload_python_packages
+            upload_python_packages,
+            parallelism
         )
     
     def build_steps(
@@ -75,7 +80,12 @@ class MLWFSteps(Steps):
             prepare_executor: Executor, 
             run_executor: Executor, 
             collect_executor: Executor,
-            upload_python_packages: List[Union[str, Path]]
+            upload_python_packages: List[Union[str, Path]],
+            parallelism: Optional[int] = None,
+            continue_on_error: bool = False,
+            continue_on_failed: bool = False,
+            continue_on_num_success: int = None,
+            continue_on_success_ratio: float = None,
         ):
         mlwf_setting = self.inputs.parameters["mlwf_setting"]
         task_setting = self.inputs.parameters["task_setting"]
@@ -99,6 +109,7 @@ class MLWFSteps(Steps):
                 "task_setting": task_setting,
                 "conf_fmt": conf_fmt
             },
+            key = "prepare-MLWF",
             executor = prepare_executor
         )
         self.add(prepare)
@@ -108,7 +119,6 @@ class MLWFSteps(Steps):
                 run_op, 
                 image = "registry.dp.tech/dptech/prod-13467/wannier-qe:7.0",
                 slices = Slices(
-                    # "int('{{item}}')",
                     input_artifact = ["task_path"],
                     input_parameter = ["frames"],
                     output_artifact = ["backward"],
@@ -124,8 +134,13 @@ class MLWFSteps(Steps):
             artifacts = {
                 "task_path": prepare.outputs.artifacts["task_path"]
             },
-            key = "run-MLWF-{{item}}",
-            executor = run_executor
+            key = "run-MLWF-{{item.order}}",
+            executor = run_executor,
+            # parallelism = parallelism,
+            # continue_on_error = continue_on_error,
+            # continue_on_failed = continue_on_failed,
+            # continue_on_num_success = continue_on_num_success,
+            # continue_on_success_ratio = continue_on_success_ratio,
         )
         self.add(run)
         collect = Step(
@@ -143,8 +158,12 @@ class MLWFSteps(Steps):
                 "mlwf_setting": prepare.outputs.parameters["mlwf_setting"],
                 "conf_fmt": conf_fmt
             },
+            key = "collect-WFC",
             executor = collect_executor
         )
         self.add(collect)
         self.outputs.artifacts["backward"]._from = run.outputs.artifacts["backward"]
+        self.outputs.artifacts["final_confs"]._from = collect.outputs.artifacts["final_confs"]
+        self.outputs.artifacts["failed_confs"]._from = collect.outputs.artifacts["failed_confs"]
+        self.outputs.parameters["final_conf_fmt"].value_from_parameter = collect.outputs.parameters["final_conf_fmt"]
         self.outputs.artifacts["wannier_function_centers"]._from = collect.outputs.artifacts["wannier_function_centers"]

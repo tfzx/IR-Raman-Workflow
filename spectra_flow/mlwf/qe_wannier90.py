@@ -130,13 +130,11 @@ class RunQeWann(RunMLWF):
             shutil.copy(f"{seed_name}_centres.xyz", back)
         shutil.rmtree(out_dir)
 
-    def run_one_frame(self, backward_dir_name: str) -> Path:
+    def run_one_frame(self, backward_dir: Path):
         mlwf = self.mlwf
         out_dir = Path(mlwf.scf_params["control"]["outdir"])
         ori_out_dir = Path("ori_out_temp").absolute()
         ori_p = Path("ori")
-        backward_dir = Path(backward_dir_name)
-        backward_dir.mkdir()
         back_abs = backward_dir.absolute()
 
         with_ef = mlwf.with_efield
@@ -154,8 +152,6 @@ class RunQeWann(RunMLWF):
                     if ef_type == "enthalpy":
                         shutil.copytree(ori_out_dir, out_dir)
                     self.run_one_subtask(qe_key, back_abs, out_dir)
-        
-        return backward_dir
 
 class CollectWann(CollectWFC):
     def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):

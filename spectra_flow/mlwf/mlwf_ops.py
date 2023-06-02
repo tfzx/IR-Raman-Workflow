@@ -15,7 +15,7 @@ from dflow.utils import (
     run_command
 )
 import dpdata
-from spectra_flow.utils import read_conf
+from spectra_flow.utils import read_conf, dump_to_fmt
 
 
 class Prepare(OP, abc.ABC):
@@ -129,23 +129,29 @@ class RunMLWF(OP, abc.ABC):
         commands: Dict[str, str] = task_setting["commands"]
         start_f, end_f = op_in["frames"]
 
-        confs_path = [Path(f"conf.{f:06d}") for f in range(start_f, end_f)]
         self.log_path = Path("run.log").absolute()
+        self.log_path.touch()
 
         self.init_cmd(mlwf_setting, commands)
-        backward = self._exec_all(task_path, confs_path, backward_list, backward_dir_name)
+        backward = self._exec_all(task_path, start_f, end_f, backward_list, backward_dir_name)
         return OPIO({
             "backward": backward
         })
     
-    def _exec_all(self, task_path: Path, confs_path: List[Path], backward_list: List[str], backward_dir_name: str):
+    def _exec_all(self, task_path: Path, start_f: int, end_f: int, backward_list: List[str], backward_dir_name: str):
         backward: List[Path] = []
         with set_directory(task_path):
-            for p in confs_path:
-                with set_directory(p):
-                    backward_dir = self.run_one_frame(backward_dir_name)
+            for frame in range(start_f, end_f):
+                conf_path = Path(f"conf.{frame:06d}")
+                with set_directory(conf_path):
+                    backward_dir = Path(backward_dir_name)
+                    backward_dir.mkdir()
+                    try:
+                        self.run_one_frame(backward_dir)
+                    except Exception as e:
+                        print(f"[ERROR] Frame {frame:06d} failed: {e}")
                     self._collect(backward_dir, backward_list)
-                    backward.append(task_path / p / backward_dir)
+                    backward.append(task_path / conf_path / backward_dir)
         return backward
 
     def _collect(self, backward_dir: Path, backward_list: List[str]):
@@ -162,9 +168,8 @@ class RunMLWF(OP, abc.ABC):
         kwargs["print_oe"] = True
         kwargs["raise_error"] = False
         ret, out, err = run_command(*args, **kwargs)
-        # if ret != 0:
-        #     print(out)
-        #     print(err)
+        if ret != 0:
+            print(f"[WARNING] Exception return of command {kwargs['cmd']}: \n{err}")
         #     assert ret == 0
         # Save log here.
         with self.log_path.open(mode = "a") as fp:
@@ -175,7 +180,7 @@ class RunMLWF(OP, abc.ABC):
         pass
 
     @abc.abstractmethod
-    def run_one_frame(self, backward_dir_name: str) -> Path:
+    def run_one_frame(self, backward_dir: Path):
         pass
 
 class CollectWFC(OP, abc.ABC):
@@ -188,13 +193,16 @@ class CollectWFC(OP, abc.ABC):
             "mlwf_setting": BigParameter(dict),
             "confs": Artifact(Path),
             "conf_fmt": BigParameter(dict),
-            "backward": Artifact(List[Path]),
+            "backward": Artifact(List[Path])
         })
 
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "wannier_function_centers": Artifact(Dict[str, Path])
+            "final_confs": Artifact(Path),
+            "final_conf_fmt": BigParameter(dict),
+            "wannier_function_centers": Artifact(Dict[str, Path]),
+            "failed_confs": Artifact(Path),
         })
 
     @OP.exec_sign_check
@@ -203,18 +211,34 @@ class CollectWFC(OP, abc.ABC):
             op_in: OPIO,
     ) -> OPIO:
         mlwf_setting: dict = op_in["mlwf_setting"]
-        conf_sys = read_conf(op_in["confs"], op_in["conf_fmt"])
+        conf_fmt = op_in["conf_fmt"]
+        conf_sys = read_conf(op_in["confs"], conf_fmt)
         backward: List[Path] = op_in["backward"]
 
-        wfc_path = self.collect_wfc(mlwf_setting, conf_sys, backward)
+        total_wfc, final_confs, failed_confs = self.collect_wfc(mlwf_setting, conf_sys, backward)
+        wfc_path: Dict[str, Path] = {}
+        for key, wfc in total_wfc.items():
+            wfc_path[key] = Path(f"wfc_{key}.raw")
+            np.savetxt(wfc_path[key], wfc)
+        final_confs_path, final_conf_fmt = dump_to_fmt(
+            "final_confs", final_confs, fmt = "deepmd/npy", in_fmt = conf_fmt, set_size = 5000
+        )
+        failed_confs_path, _ = dump_to_fmt(
+            "failed_confs", failed_confs, fmt = "deepmd/npy", set_size = 5000
+        )
         return OPIO({
-            "wannier_function_centers": wfc_path
+            "final_confs": final_confs_path,
+            "final_conf_fmt": final_conf_fmt,
+            "wannier_function_centers": wfc_path,
+            "failed_confs": failed_confs_path
         })
     
     def collect_wfc(self, mlwf_setting: dict, conf_sys: dpdata.System, backward: List[Path]):
-        assert len(backward) > 0
+        assert conf_sys.get_nframes() == len(backward)
         self.init_params(mlwf_setting, conf_sys, backward)
         total_wfc: Dict[str, np.ndarray] = {}
+        failed_frames: List[int] = []
+        success_frames: List[int] = []
         def update_wfc(wfc_frame: Dict[str, np.ndarray], frame: int):
             for key, wfc_arr in wfc_frame.items():
                 if key not in total_wfc:
@@ -222,12 +246,23 @@ class CollectWFC(OP, abc.ABC):
                 total_wfc[key][frame] = wfc_arr.flatten()
         for frame, p in enumerate(backward):
             with set_directory(p):
-                update_wfc(self.get_one_frame(), frame)
-        wfc_path: Dict[str, Path] = {}
-        for key, wfc in total_wfc.items():
-            wfc_path[key] = Path(f"wfc_{key}.raw")
-            np.savetxt(wfc_path[key], wfc)
-        return wfc_path
+                try:
+                    wfc_frame = self.get_one_frame()
+                    update_wfc(wfc_frame, frame)
+                    success_frames.append(frame)
+                except Exception as e:
+                    print(f"[ERROR] Failed to read results of frame {frame:06d}: {e}")
+                    failed_frames.append(frame)
+        if len(success_frames) == 0:
+            raise RuntimeError("All frames failed!")
+        final_confs = conf_sys.sub_system(success_frames)
+        for key in total_wfc:
+            total_wfc[key] = total_wfc[key][success_frames]
+        if len(failed_frames) > 0:
+            failed_confs = conf_sys.sub_system(failed_frames)
+        else:
+            failed_confs = None
+        return total_wfc, final_confs, failed_confs
 
 
     @abc.abstractmethod

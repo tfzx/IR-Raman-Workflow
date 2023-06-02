@@ -41,9 +41,13 @@ class DipoleSteps(BasicSteps):
     
     @classmethod
     def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
-        return {}, {
+        return {
+            "final_conf_fmt": OutputParameter()
+        }, {
+            "final_confs": OutputArtifact(),
+            "failed_confs": OutputArtifact(),
             "wannier_function_centers": OutputArtifact(),
-            "wannier_centroid": OutputArtifact()
+            "wannier_centroid": OutputArtifact(),
         }
 
     def __init__(
@@ -89,6 +93,11 @@ class DipoleSteps(BasicSteps):
             }
         )
         self.add(mlwf_step)
+
+        final_confs = mlwf_step.outputs.artifacts["final_confs"]
+        failed_confs = mlwf_step.outputs.artifacts["failed_confs"]
+        final_conf_fmt = mlwf_step.outputs.parameters["final_conf_fmt"]
+
         wc_step = Step(
             "cal-wc",
             PythonOPTemplate(
@@ -97,15 +106,18 @@ class DipoleSteps(BasicSteps):
                 python_packages = upload_python_packages
             ),
             parameters = {
-                "conf_fmt": conf_fmt
+                "conf_fmt": final_conf_fmt
             },
             artifacts={
-                "confs": confs_artifact,
+                "confs": final_confs,
                 "cal_dipole_python": cal_dipole_python,
                 "wannier_function_centers": mlwf_step.outputs.artifacts["wannier_function_centers"]
             },
             executor = cal_executor
         )
         self.add(wc_step)
+        self.outputs.artifacts["final_confs"]._from = final_confs
+        self.outputs.artifacts["failed_confs"]._from = failed_confs
+        self.outputs.parameters["final_conf_fmt"].value_from_parameter = final_conf_fmt
         self.outputs.artifacts["wannier_function_centers"]._from = mlwf_step.outputs.artifacts["wannier_function_centers"]
         self.outputs.artifacts["wannier_centroid"]._from = wc_step.outputs.artifacts["wannier_centroid"]
