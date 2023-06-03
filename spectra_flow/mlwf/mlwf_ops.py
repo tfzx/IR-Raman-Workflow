@@ -124,13 +124,11 @@ class RunMLWF(OP, abc.ABC):
         task_path: Path = op_in["task_path"]
         mlwf_setting: dict = op_in["mlwf_setting"]
         task_setting: dict = op_in["task_setting"]
-        backward_list: List[str] = list(set(task_setting["backward_list"] + self.DEFAULT_BACK))
-        backward_dir_name: str = task_setting["backward_dir_name"]
-        commands: Dict[str, str] = task_setting["commands"]
+        _backward_list = task_setting.get("backward_list", [])
+        backward_list: List[str] = list(set(_backward_list + self.DEFAULT_BACK))
+        backward_dir_name: str = task_setting.get("backward_dir_name", "back")
+        commands: Dict[str, str] = task_setting.get("commands", {})
         start_f, end_f = op_in["frames"]
-
-        self.log_path = Path("run.log").absolute()
-        self.log_path.touch()
 
         self.init_cmd(mlwf_setting, commands)
         backward = self._exec_all(task_path, start_f, end_f, backward_list, backward_dir_name)
@@ -144,6 +142,9 @@ class RunMLWF(OP, abc.ABC):
             for frame in range(start_f, end_f):
                 conf_path = Path(f"conf.{frame:06d}")
                 with set_directory(conf_path):
+                    self.log_path = Path("run.log").absolute()
+                    self.log_path.touch()
+
                     backward_dir = Path(backward_dir_name)
                     backward_dir.mkdir()
                     try:

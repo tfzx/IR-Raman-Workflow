@@ -43,11 +43,8 @@ class RunCPWF(RunMLWF):
         self.name = mlwf_setting["name"]
         return super().init_cmd(commands)
 
-    def run_one_frame(self, backward_dir_name: str) -> Path:
+    def run_one_frame(self, backward_dir: Path):
         self.run(" ".join([self.cp_cmd, "-input", f"cp_{self.name}.in"]))
-        backward_dir = Path(backward_dir_name)
-        backward_dir.mkdir()
-        return backward_dir
 
 class CollectCPWF(CollectWFC):
     a0 = 0.5291772083

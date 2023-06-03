@@ -100,7 +100,7 @@ class PrepareQeWann(Prepare):
                     Path(f"{seed_name(qe_key, w90_key)}.win").write_text(self.wannier90_writers[qe_key][w90_key].write(frame))
 
 class RunQeWann(RunMLWF):
-    DEFAULT_BACK = ["*.xyz"]
+    DEFAULT_BACK = []
     def __init__(self) -> None:
         super().__init__()
 
