@@ -54,11 +54,21 @@ class MLWFSteps(BasicSteps):
             run_executor: Executor,
             collect_executor: Executor = None,
             upload_python_packages: Optional[List[Union[str, Path]]] = None,
-            parallelism: Optional[int] = None
+            parallelism: Optional[int] = None,
+            continue_on_error: bool = False,
+            continue_on_failed: bool = True,
+            continue_on_num_success: int = None,
+            continue_on_success_ratio: float = None,
         ) -> None:
-        super().__init__(name)
+        super().__init__(
+            name, 
+            # parallelism = parallelism
+        )
         if not upload_python_packages:
-            upload_python_packages = spectra_flow.__path__
+            upload_python_packages = []
+        upload_set = set(upload_python_packages)
+        upload_set.update(spectra_flow.__path__)
+        upload_python_packages = list(upload_set)
         if not collect_executor:
             collect_executor = prepare_executor
         self.build_steps(
@@ -69,7 +79,11 @@ class MLWFSteps(BasicSteps):
             run_executor,
             collect_executor,
             upload_python_packages,
-            parallelism
+            parallelism,
+            continue_on_error,
+            continue_on_failed,
+            continue_on_num_success,
+            continue_on_success_ratio
         )
     
     def build_steps(
@@ -83,7 +97,7 @@ class MLWFSteps(BasicSteps):
             upload_python_packages: List[Union[str, Path]],
             parallelism: Optional[int] = None,
             continue_on_error: bool = False,
-            continue_on_failed: bool = False,
+            continue_on_failed: bool = True,
             continue_on_num_success: int = None,
             continue_on_success_ratio: float = None,
         ):
@@ -136,11 +150,11 @@ class MLWFSteps(BasicSteps):
             },
             key = "run-MLWF-{{item.order}}",
             executor = run_executor,
-            # parallelism = parallelism,
-            # continue_on_error = continue_on_error,
-            # continue_on_failed = continue_on_failed,
-            # continue_on_num_success = continue_on_num_success,
-            # continue_on_success_ratio = continue_on_success_ratio,
+            parallelism = parallelism,
+            continue_on_error = continue_on_error,
+            continue_on_failed = continue_on_failed,
+            continue_on_num_success = continue_on_num_success,
+            continue_on_success_ratio = continue_on_success_ratio,
         )
         self.add(run)
         collect = Step(
