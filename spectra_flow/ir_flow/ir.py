@@ -32,7 +32,7 @@ from spectra_flow.post.wannier_centroid_op import CalWC
 from spectra_flow.ir_flow.dipole_steps import DipoleSteps
 from spectra_flow.dp.dp_train import DWannTrain
 from spectra_flow.MD.deepmd_lmp_op import DpLmpSample
-from spectra_flow.ir_flow.predict_steps import PredictSteps
+from spectra_flow.dp.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_op import CalIR
 from spectra_flow.utils import (
     complete_by_default,

@@ -1,7 +1,8 @@
-from spectra_flow.base_workflow import AdaptiveFlow, BasicSteps, StepKeyPair
+from dflow.step import Step
 from typing import Dict, Iterable, List, Optional, Tuple, Union
 from pathlib import Path
 from dflow import (
+    OPTemplate,
     Step,
     Steps,
     Executor,
@@ -12,6 +13,7 @@ from dflow import (
     OutputArtifact,
     upload_artifact
 )
+from dflow.python import PythonOPTemplate
 from spectra_flow.mlwf.qe_wannier90 import (
     PrepareQeWann,
     RunQeWann,
@@ -22,16 +24,18 @@ from spectra_flow.mlwf.qe_cp import (
     RunCPWF,
     CollectCPWF
 )
+import spectra_flow
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 from spectra_flow.ir_flow.dipole_steps import DipoleSteps
-from spectra_flow.ir_flow.train_steps import TrainDwannSteps
-from spectra_flow.ir_flow.predict_steps import PredictSteps
-from spectra_flow.ir_flow.ir_steps import IRsteps
-from spectra_flow.MD.md_steps import MDSteps
+from spectra_flow.dp.dp_train import DWannTrain
+from spectra_flow.dp.predict_steps import PredictSteps
+from spectra_flow.ir_flow.ir_op import CalIR
+from spectra_flow.MD.deepmd_lmp_op import DpLmpSample
 from spectra_flow.utils import (
     get_executor
 )
 from spectra_flow.read_par import read_par
+from spectra_flow.base_workflow import AdaptiveFlow, SuperOP, StepKeyPair, StepKey
 
 def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False):
     inputs = read_par(parameters)
@@ -89,13 +93,14 @@ def build_ir(
         run_config = {}
     inputs, run_list = prep_par(parameters, run_config, debug)
     ir_template = IRflow(
-        "IR-Flow", 
-        run_config, 
-        executors, 
-        upload_python_packages, 
-        run_list,
-        with_parallel,
-        debug
+        name = "IR-Flow", 
+        run_config = run_config, 
+        executors = executors, 
+        upload_python_packages = upload_python_packages, 
+        run_list = run_list,
+        given_inputs = inputs.keys(),
+        with_parallel = with_parallel,
+        debug = debug
     )
     in_p, in_a = ir_template.get_inputs_list()
     input_parameters = {key: inputs[key] for key in in_p if key in inputs}
@@ -114,47 +119,52 @@ def build_ir(
 class IRflow(AdaptiveFlow):
     all_steps = {
         "dipole": DipoleSteps, 
-        "train": TrainDwannSteps, 
-        "md": MDSteps, 
+        "train": DWannTrain, 
+        "md": DpLmpSample, 
         "predict": PredictSteps, 
-        "cal_ir": IRsteps
+        "cal_ir": CalIR
     }
     steps_list = ["dipole", "train", "md", "predict", "cal_ir"]
     parallel_steps = [["dipole"], ["train", "md"], ["predict"], ["cal_ir"]]
     main_steps = ["dipole", "train", "predict", "cal_ir"]
     @classmethod
     def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
+        this = StepKey()
+        dipole = StepKey("dipole")
+        train = StepKey("train")
+        md = StepKey("md")
+        predict = StepKey("predict")
         return {
             "dipole": {
-                "mlwf_setting": [(None, "mlwf_setting")],
-                "task_setting": [(None, "task_setting")],
-                "conf_fmt": [(None, "train_conf_fmt")],
-                "confs": [(None, "train_confs")],
-                "pseudo": [(None, "pseudo")],
-                "cal_dipole_python": [(None, "cal_dipole_python")],
+                "mlwf_setting": [this.mlwf_setting],
+                "task_setting": [this.task_setting],
+                "conf_fmt": [this.train_conf_fmt],
+                "confs": [this.train_confs],
+                "pseudo": [this.pseudo],
+                "cal_dipole_python": [this.cal_dipole_python],
             },
             "train": {
-                "conf_fmt": [(None, "train_conf_fmt")],
-                "confs": [(None, "train_confs")],
-                "dp_setting": [(None, "dp_setting")],
-                "wannier_centroid": [(None, "train_label"), ("dipole", "wannier_centroid")],
+                "conf_fmt": [this.train_conf_fmt],
+                "confs": [this.train_confs],
+                "dp_setting": [this.dp_setting],
+                "label": [this.train_label, dipole.wannier_centroid],
             },
             "md": {
-                "global": [(None, "global")],
-                "init_conf_fmt": [(None, "init_conf_fmt")],
-                "init_conf": [(None, "init_conf")],
-                "dp_model": [(None, "dp_model")],
+                "global": [this.global_config],
+                "conf_fmt": [this.init_conf_fmt],
+                "init_conf": [this.init_conf],
+                "dp_model": [this.dp_model],
             },
             "predict": {
-                "dp_setting": [(None, "dp_setting")],
-                "sampled_system": [(None, "sampled_system"), ("md", "sampled_system")],
-                "sys_fmt": [(None, "sys_fmt"), ("md", "sys_fmt")],
-                "dwann_model": [(None, "dwann_model"), ("train", "dwann_model")],
-                "cal_dipole_python": [(None, "cal_dipole_python")],
+                "dp_setting": [this.dp_setting],
+                "sampled_system": [this.sampled_system, md.sampled_system],
+                "sys_fmt": [this.sys_fmt, md.sys_fmt],
+                "frozen_model": [this.dwann_model, train.frozen_model],
+                "cal_dipole_python": [this.cal_dipole_python],
             },
             "cal_ir": {
-                "global": [(None, "global")],
-                "total_dipole": [("predict", "total_dipole"), (None, "total_dipole")],
+                "global": [this.global_config],
+                "total_dipole": [predict.total_tensor, this.total_dipole],
             }
         }
 
@@ -164,26 +174,44 @@ class IRflow(AdaptiveFlow):
             executors: Dict[str, Executor],
             upload_python_packages: List[Union[str, Path]] = None,
             run_list: Iterable[str] = None,
+            given_inputs: Optional[Iterable[str]] = None, 
+            pri_source: str = None, 
             with_parallel: bool = True,
             debug: bool = False
         ):
         self.run_config = run_config
         self.executors = executors
-        self.upload_python_packages = upload_python_packages
+        self.python_op_executor = {
+            "train": self.executors["train"],
+            "md": self.executors["deepmd_lammps"],
+            "cal_ir": self.executors["cal"],
+        }
+        if upload_python_packages is None:
+            upload_python_packages = []
+        up_py_set = set(upload_python_packages)
+        up_py_set.update(spectra_flow.__path__)
+        self.upload_python_packages = list(up_py_set)
         if run_list is None:
             run_list = self.to_run_list(run_config)
-        super().__init__(name, run_list, with_parallel, debug)
+        super().__init__(
+            name = name, 
+            run_list = run_list,
+            given_inputs = given_inputs,
+            pri_source = pri_source,
+            with_parallel = with_parallel, 
+            debug = debug
+        )
     
-    def build_templates(self, run_list: List[str]) -> Dict[str, Steps]:
+    def build_templates(self, run_list: List[str]) -> Dict[str, OPTemplate]:
         build_dict = {
             DipoleSteps: self.build_dipole_temp,
-            TrainDwannSteps: self.build_train_temp,
-            MDSteps: self.build_md_temp,
+            DWannTrain: self.build_train_temp,
+            DpLmpSample: self.build_md_temp,
             PredictSteps: self.build_predict_temp,
-            IRsteps: self.build_ir_temp,
+            CalIR: self.build_ir_temp,
         }
         return {step_name: build_dict[self.all_steps[step_name]]() for step_name in run_list}
-        
+
     def to_run_list(self, run_config: dict):
         name_dict = {self.main_steps[i]: i for i in range(4)}
         run_list = [self.main_steps[i] for i in range(name_dict[run_config["start_steps"]], name_dict[run_config["end_steps"]] + 1)]
@@ -221,32 +249,33 @@ class IRflow(AdaptiveFlow):
         )
 
     def build_train_temp(self):
-        return TrainDwannSteps(
-            "train-dwann",
-            self.executors["train"],
-            self.upload_python_packages
+        return PythonOPTemplate(
+            DWannTrain, 
+            image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+            python_packages = self.upload_python_packages
         )
     
     def build_md_temp(self):
-        return MDSteps(
-            "MD",
-            self.executors["deepmd_lammps"],
-            self.upload_python_packages
+        return PythonOPTemplate(
+            DpLmpSample, 
+            image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+            python_packages = self.upload_python_packages
         )
     
     def build_predict_temp(self):
         return PredictSteps(
             "predict",
+            "dipole",
             self.executors["predict"],
             self.executors["cal"],
             self.upload_python_packages
         )
     
     def build_ir_temp(self):
-        return IRsteps(
-            "Cal-IR",
-            self.executors["cal"],
-            self.upload_python_packages
+        return PythonOPTemplate(
+            CalIR, 
+            image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+            python_packages = self.upload_python_packages
         )
     
 if __name__ == "__main__":
@@ -285,5 +314,5 @@ if __name__ == "__main__":
             "predict": ex,
             "deepmd_lammps": ex,
         },
-        debug = False
+        debug = True
     )
