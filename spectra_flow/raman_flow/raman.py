@@ -92,8 +92,8 @@ def build_raman(
     if run_config is None:
         run_config = {}
     inputs, run_list = prep_par(parameters, run_config, debug)
-    ir_template = RamanFlow(
-        name = "IR-Flow", 
+    raman_template = RamanFlow(
+        name = "Raman-Flow", 
         run_config = run_config, 
         executors = executors, 
         upload_python_packages = upload_python_packages, 
@@ -102,19 +102,19 @@ def build_raman(
         with_parallel = with_parallel,
         debug = debug
     )
-    in_p, in_a = ir_template.get_inputs_list()
+    in_p, in_a = raman_template.get_inputs_list()
     input_parameters = {key: inputs[key] for key in in_p if key in inputs}
     input_artifacts_path = {key: inputs[key] for key in in_a if key in inputs}
     input_artifacts = {}
     for in_key, path in input_artifacts_path.items():
         input_artifacts[in_key] = upload_artifact(path)
-    ir_step = Step(
+    raman_step = Step(
         name,
-        ir_template,
+        raman_template,
         parameters = input_parameters,
         artifacts = input_artifacts
     )
-    return ir_step
+    return raman_step
 
 class RamanFlow(AdaptiveFlow):
     all_steps = {
@@ -165,7 +165,7 @@ class RamanFlow(AdaptiveFlow):
             },
             "cal_raman": {
                 "global": [this.global_config],
-                "total_polar": [predict.total_tensor, this.total_polar],
+                "total_polar": [this.total_polar, predict.total_tensor],
             }
         }
 

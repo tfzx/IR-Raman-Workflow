@@ -40,11 +40,13 @@ def read_par(parameters: Dict[str, dict]):
 
     read_list = [
         ("global_config", config, ["global"]),
+        ("polar_setting", config, ["polar"]),
         ("mlwf_setting", config, ["dipole", "mlwf_setting"]),
         ("task_setting", config, ["dipole", "task_setting"]),
         ("dp_setting", config, ["deep_model"]),
         ("dp_model", frozen_model, ["deep_potential"]),
         ("dwann_model", frozen_model, ["deep_wannier"]),
+        ("dpolar_model", frozen_model, ["deep_polar"]),
         ("pseudo", other, ["pseudo"]),
         ("train_label", other, ["train_label"]),
         ("total_dipole", other, ["total_dipole"]),
@@ -60,18 +62,6 @@ def read_par(parameters: Dict[str, dict]):
     ]
     for keys in file_config_list:
         config_from_file(inputs, keys)
-    # if "dp_setting" in inputs and "train_inputs" in inputs["dp_setting"] \
-    #     and isinstance(inputs["dp_setting"]["train_inputs"], str):
-    #     inputs["dp_setting"]["train_inputs"] = load_json(inputs["dp_setting"]["train_inputs"])
-    # if "mlwf_setting" in inputs:
-    #     if isinstance(inputs["mlwf_setting"], str):
-    #         inputs["mlwf_setting"] = load_json(inputs["mlwf_setting"])
-    #     elif isinstance(inputs["mlwf_setting"], list):
-    #         mlwf_setting_l = []
-    #         for p in inputs["mlwf_setting"]:
-    #             mlwf_setting_l.append(load_json(p))
-    #         inputs["mlwf_setting"] = mlwf_setting_l
-
     sys_fmt_map = {
         "train_confs": "train_conf_fmt",
         "sampled_system": "sys_fmt",
