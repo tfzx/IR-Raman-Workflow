@@ -10,7 +10,7 @@ from dflow.python import (
 )
 from spectra_flow.raman_flow.cal_raman import calculate_corr_polar, calculate_raman
 
-class CalIR(OP):
+class CalRaman(OP):
     def __init__(self) -> None:
         super().__init__()
     
