@@ -5,9 +5,9 @@ from dflow import (
     upload_artifact,
     download_artifact
 )
-from spectra_flow.ir_flow.dipole_steps import DipoleSteps
+from spectra_flow.SuperOP.dipole_steps import DipoleSteps
 from spectra_flow.mlwf.qe_cp import PrepareCP, RunCPWF, CollectCPWF
-from spectra_flow.mlwf.mlwf_steps import MLWFSteps
+from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
 from spectra_flow.utils import load_json, bohrium_login, get_executor
 
 if __name__ == "__main__":

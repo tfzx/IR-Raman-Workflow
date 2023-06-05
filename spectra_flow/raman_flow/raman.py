@@ -25,8 +25,8 @@ from spectra_flow.mlwf.qe_cp import (
     CollectCPWF
 )
 import spectra_flow
-from spectra_flow.mlwf.mlwf_steps import MLWFSteps
-from spectra_flow.raman_flow.polar_steps import PolarSteps
+from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
+from spectra_flow.SuperOP.polar_steps import PolarSteps
 from spectra_flow.dp.dp_train import DPolarTrain
 from spectra_flow.dp.predict_steps import PredictSteps
 from spectra_flow.raman_flow.raman_op import CalRaman

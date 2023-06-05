@@ -17,10 +17,10 @@ from dflow.python import (
 )
 import spectra_flow
 from spectra_flow.base_workflow import SuperOP
-from spectra_flow.mlwf.mlwf_steps import MLWFSteps
-from spectra_flow.ir_flow.dipole_steps import DipoleSteps
-from spectra_flow.raman_flow.prep_polar import PrepPolar
-from spectra_flow.raman_flow.post_polar import PostPolar
+from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
+from spectra_flow.SuperOP.dipole_steps import DipoleSteps
+from spectra_flow.SuperOP.prep_polar import PrepPolar
+from spectra_flow.SuperOP.post_polar import PostPolar
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
 # from mlwf_op.collect_wfc_op import CollectWFC

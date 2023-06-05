@@ -18,7 +18,7 @@ from dflow.python import (
 )
 import spectra_flow
 from spectra_flow.base_workflow import SuperOP
-from spectra_flow.mlwf.mlwf_steps import MLWFSteps
+from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
 from spectra_flow.post.wannier_centroid_op import CalWC
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF

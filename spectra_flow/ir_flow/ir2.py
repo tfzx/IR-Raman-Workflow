@@ -25,8 +25,8 @@ from spectra_flow.mlwf.qe_cp import (
     CollectCPWF
 )
 import spectra_flow
-from spectra_flow.mlwf.mlwf_steps import MLWFSteps
-from spectra_flow.ir_flow.dipole_steps import DipoleSteps
+from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
+from spectra_flow.SuperOP.dipole_steps import DipoleSteps
 from spectra_flow.dp.dp_train import DWannTrain
 from spectra_flow.dp.predict_steps import PredictSteps
 from spectra_flow.ir_flow.ir_op import CalIR

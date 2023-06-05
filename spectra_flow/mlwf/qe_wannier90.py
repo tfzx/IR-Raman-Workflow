@@ -12,7 +12,7 @@ from spectra_flow.mlwf.inputs import (
     get_qe_writers,
     get_pw_w90_writers
 )
-from spectra_flow.mlwf.mlwf_reader import MLWFReaderQeW90
+from spectra_flow.SuperOP.mlwf_reader import MLWFReaderQeW90
 
 class PrepareQeWann(Prepare):
     """
