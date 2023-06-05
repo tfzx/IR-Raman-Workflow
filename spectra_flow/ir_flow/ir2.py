@@ -102,7 +102,8 @@ def build_ir(
         with_parallel = with_parallel,
         debug = debug
     )
-    in_p, in_a = ir_template.get_inputs_list()
+    in_p = ir_template.input_parameters
+    in_a = ir_template.input_artifacts
     input_parameters = {key: inputs[key] for key in in_p if key in inputs}
     input_artifacts_path = {key: inputs[key] for key in in_a if key in inputs}
     input_artifacts = {}

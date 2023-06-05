@@ -436,9 +436,21 @@ class AdaptiveFlow(Steps, abc.ABC):
             for key in a:
                 self.outputs.artifacts[key]._from = s.outputs.artifacts[key]
 
-    def get_inputs_list(self):
-        # TODO: property
-        return list(self._input_parameters.keys()), list(self._input_artifacts.keys())
+    @property
+    def input_parameters(self):
+        return self._input_parameters
+
+    @property
+    def input_artifacts(self):
+        return self._input_artifacts
+    
+    @property
+    def output_parameters(self):
+        return self._output_parameters
+    
+    @property
+    def output_artifacts(self):
+        return self._output_artifacts
 
     @classmethod
     def get_substeps_inputs(cls):
