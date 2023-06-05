@@ -13,10 +13,10 @@ from dflow.python import (
 )
 from dflow.step import Step
 import spectra_flow
-from spectra_flow.base_workflow import BasicSteps
+from spectra_flow.base_workflow import SuperOP
 from spectra_flow.dp.dp_train import DWannTrain
 
-class TrainDwannSteps(BasicSteps):
+class TrainDwannSteps(SuperOP):
     @classmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {

@@ -19,11 +19,12 @@ from dflow.python import (
 )
 from dflow.step import Step
 import spectra_flow
-from spectra_flow.base_workflow import BasicSteps
+from spectra_flow.base_workflow import SuperOP
 from spectra_flow.post.total_dipole_op import CalTotalDipole
-from spectra_flow.dp.dp_predict import DWannPredict
+from spectra_flow.post.total_polar_op import CalTotalPolar
+from spectra_flow.dp.dp_predict import DWannPredict, DPolarPredict
 
-class PredictSteps(BasicSteps):
+class PredictSteps(SuperOP):
     @classmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {
@@ -31,19 +32,20 @@ class PredictSteps(BasicSteps):
             "sys_fmt": InputParameter(type = dict, value = {}),
         }, {
             "sampled_system": InputArtifact(),
-            "dwann_model": InputArtifact(),
+            "frozen_model": InputArtifact(),
             "cal_dipole_python": InputArtifact(optional = True)
         }
     
     @classmethod
     def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
         return {}, {
-            "predicted_wc": OutputArtifact(),
-            "total_dipole": OutputArtifact(),
+            "predicted_tensor": OutputArtifact(),
+            "total_tensor": OutputArtifact(),
         }
 
     def __init__(self, 
             name: str,
+            tensor_type: str,
             predict_executor: Executor,
             cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]] = None
@@ -51,7 +53,9 @@ class PredictSteps(BasicSteps):
         super().__init__(name)
         if not upload_python_packages:
             upload_python_packages = spectra_flow.__path__
+        tensor_type = tensor_type.lower().strip()
         self.build_steps(
+            tensor_type,
             predict_executor, 
             cal_executor,
             upload_python_packages
@@ -59,26 +63,36 @@ class PredictSteps(BasicSteps):
 
     def build_steps(
             self, 
+            tensor_type: str,
             predict_executor: Executor,
             cal_executor: Executor,
             upload_python_packages: List[Union[str, Path]]
         ):
         dp_setting = self.inputs.parameters["dp_setting"]
         sys_fmt = self.inputs.parameters["sys_fmt"]
-        sampled_system_artifact = self.inputs.artifacts["sampled_system"]
-        dwann_model_artifact = self.inputs.artifacts["dwann_model"]
+        sampled_system = self.inputs.artifacts["sampled_system"]
+        frozen_model = self.inputs.artifacts["frozen_model"]
         cal_dipole_python = self.inputs.artifacts["cal_dipole_python"]
         
-        predict_dipole = Step(
-            "predict-dipole",
+        if tensor_type == "dipole":
+            predict_op = DWannPredict
+            total_tensor_op = CalTotalDipole
+        elif tensor_type == "polar":
+            predict_op = DPolarPredict
+            total_tensor_op = CalTotalPolar
+        else:
+            raise RuntimeError(f"Tensor_type {tensor_type} is not supported!")
+
+        predict_step = Step(
+            f"predict-{tensor_type}",
             PythonOPTemplate(
-                DWannPredict, 
+                predict_op, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages
             ),
             artifacts = {
-                "sampled_system": sampled_system_artifact,
-                "frozen_model": dwann_model_artifact
+                "sampled_system": sampled_system,
+                "frozen_model": frozen_model
             },
             parameters = {
                 "dp_setting": dp_setting,
@@ -86,26 +100,26 @@ class PredictSteps(BasicSteps):
             },
             executor = predict_executor
         )
-        self.add(predict_dipole)
+        self.add(predict_step)
 
-        total_dipole = Step(
-            "total-dipole",
+        total_tensor = Step(
+            f"total-{tensor_type}",
             PythonOPTemplate(
-                CalTotalDipole, 
+                total_tensor_op, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
                 python_packages = upload_python_packages
             ),
             artifacts={
-                "confs": sampled_system_artifact,
+                "confs": sampled_system,
                 "cal_dipole_python": cal_dipole_python,
-                "wannier_centroid": predict_dipole.outputs.artifacts["predicted_tensor"]
+                "wannier_centroid": predict_step.outputs.artifacts["predicted_tensor"]
             },
             parameters = {
                 "conf_fmt": sys_fmt,
             },
             executor = cal_executor
         )
-        self.add(total_dipole)
+        self.add(total_tensor)
 
-        self.outputs.artifacts["predicted_wc"]._from = predict_dipole.outputs.artifacts["predicted_tensor"]
-        self.outputs.artifacts["total_dipole"]._from = total_dipole.outputs.artifacts["total_dipole"]
+        self.outputs.artifacts["predicted_tensor"]._from = predict_step.outputs.artifacts["predicted_tensor"]
+        self.outputs.artifacts["total_tensor"]._from = total_tensor.outputs.artifacts[f"total_{tensor_type}"]
