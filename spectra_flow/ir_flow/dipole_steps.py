@@ -17,7 +17,7 @@ from dflow.python import (
     OP
 )
 import spectra_flow
-from spectra_flow.base_workflow import BasicSteps
+from spectra_flow.base_workflow import SuperOP
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 from spectra_flow.post.wannier_centroid_op import CalWC
 # from mlwf_op.prepare_input_op import Prepare
@@ -26,7 +26,7 @@ from spectra_flow.post.wannier_centroid_op import CalWC
 # from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
 # from mlwf_op.collect_wannier90 import CollectWann
 
-class DipoleSteps(BasicSteps):
+class DipoleSteps(SuperOP):
     @classmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {

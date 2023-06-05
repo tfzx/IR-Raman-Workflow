@@ -19,9 +19,9 @@ from dflow.python import (
     OP
 )
 import spectra_flow
-from spectra_flow.base_workflow import BasicSteps
+from spectra_flow.base_workflow import SuperOP
 
-class MLWFSteps(BasicSteps):
+class MLWFSteps(SuperOP):
     @classmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {
