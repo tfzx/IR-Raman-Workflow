@@ -16,7 +16,7 @@ from dflow.python import (
     OP
 )
 import spectra_flow
-from spectra_flow.base_workflow import BasicSteps
+from spectra_flow.base_workflow import SuperOP
 from spectra_flow.mlwf.mlwf_steps import MLWFSteps
 from spectra_flow.ir_flow.dipole_steps import DipoleSteps
 from spectra_flow.raman_flow.prep_polar import PrepPolar
@@ -27,7 +27,7 @@ from spectra_flow.raman_flow.post_polar import PostPolar
 # from mlwf_op.qe_wannier90 import PrepareQeWann, RunQeWann
 # from mlwf_op.collect_wannier90 import CollectWann
 
-class PolarSteps(BasicSteps):
+class PolarSteps(SuperOP):
     @classmethod
     def get_inputs(cls) -> Tuple[Dict[str, InputParameter], Dict[str, InputArtifact]]:
         return {
@@ -43,7 +43,11 @@ class PolarSteps(BasicSteps):
     
     @classmethod
     def get_outputs(cls) -> Tuple[Dict[str, OutputParameter], Dict[str, OutputArtifact]]:
-        return {}, {
+        return {
+            "final_conf_fmt": OutputParameter()
+        }, {
+            "final_confs": OutputArtifact(),
+            "failed_confs": OutputArtifact(),
             "wannier_function_centers": OutputArtifact(),
             "wannier_centroid": OutputArtifact(),
             "polarizability": OutputArtifact()
@@ -115,6 +119,10 @@ class PolarSteps(BasicSteps):
             }
         )
         self.add(dipole_step)
+        final_confs = dipole_step.outputs.artifacts["final_confs"]
+        failed_confs = dipole_step.outputs.artifacts["failed_confs"]
+        final_conf_fmt = dipole_step.outputs.parameters["final_conf_fmt"]
+
         post_polar = Step(
             name = "post-polar",
             template = PythonOPTemplate(
@@ -123,15 +131,18 @@ class PolarSteps(BasicSteps):
             ),
             parameters = {
                 "polar_setting": polar_setting,
-                "conf_fmt": conf_fmt
+                "conf_fmt": final_conf_fmt
             },
             artifacts = {
-                "confs": confs_artifact,
+                "confs": final_confs,
                 "wannier_centroid": dipole_step.outputs.artifacts["wannier_centroid"]
             },
             executor = cal_executor
         )
         self.add(post_polar)
+        self.outputs.artifacts["final_confs"]._from = final_confs
+        self.outputs.artifacts["failed_confs"]._from = failed_confs
+        self.outputs.parameters["final_conf_fmt"].value_from_parameter = final_conf_fmt
         self.outputs.artifacts["wannier_function_centers"]._from = dipole_step.outputs.artifacts["wannier_function_centers"]
         self.outputs.artifacts["wannier_centroid"]._from = dipole_step.outputs.artifacts["wannier_centroid"]
         self.outputs.artifacts["polarizability"]._from = post_polar.outputs.artifacts["polarizability"]
