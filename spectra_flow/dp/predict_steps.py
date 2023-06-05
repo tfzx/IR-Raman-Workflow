@@ -77,9 +77,11 @@ class PredictSteps(SuperOP):
         if tensor_type == "dipole":
             predict_op = DWannPredict
             total_tensor_op = CalTotalDipole
+            tensor_name = "wannier_centroid"
         elif tensor_type == "polar":
             predict_op = DPolarPredict
             total_tensor_op = CalTotalPolar
+            tensor_name = "polar"
         else:
             raise RuntimeError(f"Tensor_type {tensor_type} is not supported!")
 
@@ -112,7 +114,7 @@ class PredictSteps(SuperOP):
             artifacts={
                 "confs": sampled_system,
                 "cal_dipole_python": cal_dipole_python,
-                "wannier_centroid": predict_step.outputs.artifacts["predicted_tensor"]
+                tensor_name: predict_step.outputs.artifacts["predicted_tensor"]
             },
             parameters = {
                 "conf_fmt": sys_fmt,
