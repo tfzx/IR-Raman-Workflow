@@ -39,7 +39,7 @@ def read_par(parameters: Dict[str, dict]):
     inputs = {"global": global_config}
 
     read_list = [
-        ("global", config, ["global"]),
+        ("global_config", config, ["global"]),
         ("mlwf_setting", config, ["dipole", "mlwf_setting"]),
         ("task_setting", config, ["dipole", "task_setting"]),
         ("dp_setting", config, ["deep_model"]),
