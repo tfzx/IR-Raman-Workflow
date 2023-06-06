@@ -13,8 +13,8 @@ if __name__ == "__main__":
 
     # 4 steps: dipole, train, predict, cal_ir
     run_config = {
-        "start_steps": "cal_ir",
-        "end_steps": "cal_ir"
+        "start_step": "cal_ir",
+        "end_step": "cal_ir"
     }
     ir_step = build_ir("ir-example2", load_json("parameters.json"), load_json("../machine.json"), run_config)
 

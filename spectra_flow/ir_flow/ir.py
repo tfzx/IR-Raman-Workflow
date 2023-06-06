@@ -47,32 +47,36 @@ def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False)
     assert len(run_tree) > 0, "Cannot run any step from the inputs!"
     if "dipole" in parameters["config"]:
         run_config["dft_type"] = parameters["config"]["dipole"]["dft_type"]
-    if "start_steps" in run_config:
-        start_i = name_dict[run_config["start_steps"]]
-        if "end_steps" in run_config:
-            end_i = name_dict[run_config["end_steps"]]
+    if "start_step" in run_config:
+        start_i = name_dict[run_config["start_step"]]
+        if "end_step" in run_config:
+            end_i = name_dict[run_config["end_step"]]
         else:
             end_i = 0
             for step_name in run_tree:
                 end_i = max(end_i, name_dict[step_name])
         if end_i < start_i:
-            raise AssertionError(f"Cannot start at {run_config['start_steps']}")
+            raise AssertionError(f"Cannot start at {run_config['start_step']}")
+        end_step = IRflow.main_steps[end_i]
+        run_md = run_config.get("run_md", True)
+        if "md" in run_tree[end_step] and (not run_md):
+            raise AssertionError("'run_md' in run_config is False, but MD is necessary!")
         run_list = [IRflow.main_steps[i] for i in range(start_i, end_i + 1)]
-        if "predict" in run_list and (not run_config.get("provide_sample", False)):
+        if "predict" in run_list and run_md:
             run_list += ["md"]
     else:
-        if "end_steps" in run_config:
-            end_steps = run_config["end_steps"]
+        if "end_step" in run_config:
+            end_step = run_config["end_step"]
         else:
             for step_name in reversed(IRflow.main_steps):
                 if step_name in run_tree:
-                    end_steps = step_name
+                    end_step = step_name
                     break
             else:
-                end_steps = "md"
-        run_list = run_tree[end_steps]
-        if run_config.get("provide_sample", False) and "md" in run_list:
-            print("[WARNING] 'provide_sample' in run_config is set to be True, but MD is necessary!")
+                end_step = "md"
+        run_list = run_tree[end_step]
+        if (not run_config.get("run_md", True)) and "md" in run_list:
+            raise AssertionError("'run_md' in run_config is False, but MD is necessary!")
     return inputs, run_list
     
 
@@ -215,8 +219,8 @@ class IRflow(AdaptiveFlow):
 
     def to_run_list(self, run_config: dict):
         name_dict = {self.main_steps[i]: i for i in range(4)}
-        run_list = [self.main_steps[i] for i in range(name_dict[run_config["start_steps"]], name_dict[run_config["end_steps"]] + 1)]
-        if not run_config.get("provide_sample", False):
+        run_list = [self.main_steps[i] for i in range(name_dict[run_config["start_step"]], name_dict[run_config["end_step"]] + 1)]
+        if run_config.get("run_md", True):
             run_list += ["md"]
         return run_list
     
@@ -302,10 +306,10 @@ if __name__ == "__main__":
     flow = IRflow(
         "ir", 
         {
-            "start_steps": "dipole", 
-            "end_steps": "cal_ir", 
+            "start_step": "dipole", 
+            "end_step": "cal_ir", 
             "dft_type": "qe",
-            "provide_sample": False
+            "run_md": True
         },
         executors = {
             "base": ex,

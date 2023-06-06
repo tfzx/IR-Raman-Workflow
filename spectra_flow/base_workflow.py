@@ -276,8 +276,8 @@ class AdaptiveFlow(Steps, abc.ABC):
                         break
                 else:
                     raise AssertionError(
-                        f"Cannot build Super OP {self.__class__.__name__}! \n\
-                        Step {step_name}({steps.__class__.__name__}) miss one input '{in_key}'!"
+                        f"Cannot build workflow {self.__class__.__name__}!\n" + 
+                        f"Step {step_name}({steps.__name__}) miss one input '{in_key}'!"
                     )
         return total_io
     
@@ -307,7 +307,7 @@ class AdaptiveFlow(Steps, abc.ABC):
                     if pre_steps_name is None:
                         input_artifacts[out_key] = inputs_dict[steps][in_key]
                 else:
-                    raise AssertionError(f"Step {step_name}({steps.__class__.__name__}) has no inputs named '{in_key}'!")
+                    raise AssertionError(f"Step {step_name}({steps.__name__}) has no inputs named '{in_key}'!")
 
         self._input_parameters = input_parameters
         self._input_artifacts = input_artifacts
@@ -574,9 +574,9 @@ class AdaptiveFlow(Steps, abc.ABC):
         components: List[List[str]] = []
         remained_list = copy(run_list)
         while remained_list:
-            end_steps = remained_list[-1]
+            end_step = remained_list[-1]
             mask.fill(False)
-            mask[run_dict[end_steps]] = True
+            mask[run_dict[end_step]] = True
             new_mask = mask
             while new_mask.any():
                 new_mask = (np.sum(inc_mat[new_mask, :], axis = 0) > 0) & (~mask)
