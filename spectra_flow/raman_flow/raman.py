@@ -124,19 +124,19 @@ def build_raman(
 class RamanFlow(AdaptiveFlow):
     all_steps = {
         "polar": PolarSteps, 
-        "train": DPolarTrain, 
+        "train_polar": DPolarTrain, 
         "md": DpLmpSample, 
         "predict": PredictSteps, 
         "cal_raman": CalRaman
     }
-    steps_list = ["polar", "train", "md", "predict", "cal_raman"]
-    parallel_steps = [["polar"], ["train", "md"], ["predict"], ["cal_raman"]]
-    main_steps = ["polar", "train", "predict", "cal_raman"]
+    steps_list = ["polar", "train_polar", "md", "predict", "cal_raman"]
+    parallel_steps = [["polar"], ["train_polar", "md"], ["predict"], ["cal_raman"]]
+    main_steps = ["polar", "train_polar", "predict", "cal_raman"]
     @classmethod
     def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
         this = StepKey()
         polar = StepKey("polar")
-        train = StepKey("train")
+        train_polar = StepKey("train_polar")
         md = StepKey("md")
         predict = StepKey("predict")
         return {
@@ -149,7 +149,7 @@ class RamanFlow(AdaptiveFlow):
                 "pseudo": [this.pseudo],
                 "cal_dipole_python": [this.cal_dipole_python],
             },
-            "train": {
+            "train_polar": {
                 "conf_fmt": [this.train_conf_fmt],
                 "confs": [this.train_confs],
                 "dp_setting": [this.dp_setting],
@@ -165,7 +165,7 @@ class RamanFlow(AdaptiveFlow):
                 "dp_setting": [this.dp_setting],
                 "sampled_system": [this.sampled_system, md.sampled_system],
                 "sys_fmt": [this.sys_fmt, md.sys_fmt],
-                "frozen_model": [this.dpolar_model, train.frozen_model],
+                "frozen_model": [this.dpolar_model, train_polar.frozen_model],
                 "cal_dipole_python": [this.cal_dipole_python],
             },
             "cal_raman": {
@@ -188,7 +188,7 @@ class RamanFlow(AdaptiveFlow):
         self.run_config = run_config
         self.executors = executors
         self.python_op_executor = {
-            "train": self.executors["train"],
+            "train_polar": self.executors["train"],
             "md": self.executors["deepmd_lammps"],
             "cal_raman": self.executors["cal"],
         }
