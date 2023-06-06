@@ -217,10 +217,11 @@ class IRflow(AdaptiveFlow):
         }
         return {step_name: build_dict[self.all_steps[step_name]]() for step_name in run_list}
 
-    def to_run_list(self, run_config: dict):
-        name_dict = {self.main_steps[i]: i for i in range(4)}
-        run_list = [self.main_steps[i] for i in range(name_dict[run_config["start_step"]], name_dict[run_config["end_step"]] + 1)]
-        if run_config.get("run_md", True):
+    @classmethod
+    def to_run_list(cls, run_config: dict):
+        name_dict = {cls.main_steps[i]: i for i in range(4)}
+        run_list = [cls.main_steps[i] for i in range(name_dict[run_config["start_step"]], name_dict[run_config["end_step"]] + 1)]
+        if run_config.get("run_md", True) and "predict_dipole" in run_list:
             run_list += ["md"]
         return run_list
     
