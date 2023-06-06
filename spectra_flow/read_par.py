@@ -43,7 +43,8 @@ def read_par(parameters: Dict[str, dict]):
         ("polar_setting", config, ["polar"]),
         ("mlwf_setting", config, ["dipole", "mlwf_setting"]),
         ("task_setting", config, ["dipole", "task_setting"]),
-        ("dp_setting", config, ["deep_model"]),
+        ("dwann_setting", config, ["deep_wannier"]),  # TODO
+        ("dpolar_setting", config, ["deep_polar"]),  # TODO
         ("dp_model", frozen_model, ["deep_potential"]),
         ("dwann_model", frozen_model, ["deep_wannier"]),
         ("dpolar_model", frozen_model, ["deep_polar"]),

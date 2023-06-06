@@ -32,7 +32,7 @@
             }
         },
 
-        "deep_model": {
+        "deep_wannier": {
             "train_inputs": {
                 "model":{
                     "type_map":		["O", "H"],

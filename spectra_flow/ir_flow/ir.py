@@ -151,7 +151,7 @@ class IRflow(AdaptiveFlow):
             "train_wann": {
                 "conf_fmt": [this.train_conf_fmt],
                 "confs": [this.train_confs],
-                "dp_setting": [this.dp_setting],
+                "dp_setting": [this.dwann_setting],
                 "label": [this.train_label, dipole.wannier_centroid],
             },
             "md": {
@@ -161,7 +161,7 @@ class IRflow(AdaptiveFlow):
                 "dp_model": [this.dp_model],
             },
             "predict": {
-                "dp_setting": [this.dp_setting],
+                "dp_setting": [this.dwann_setting],
                 "sampled_system": [this.sampled_system, md.sampled_system],
                 "sys_fmt": [this.sys_fmt, md.sys_fmt],
                 "frozen_model": [this.dwann_model, train_wann.frozen_model],
