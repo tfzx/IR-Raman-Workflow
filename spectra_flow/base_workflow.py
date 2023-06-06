@@ -215,6 +215,8 @@ class AdaptiveFlow(Steps, abc.ABC):
         )
         print("\n--------------- Build Steps ---------------\n")
         self.templates = self.build_templates(run_list)
+        if debug:
+            self.check_templates()
         self.build(steps_inputs_parameters, steps_inputs_artifacts, step_ll)
         self.set_outputs(step_ll)
     
@@ -526,6 +528,13 @@ class AdaptiveFlow(Steps, abc.ABC):
                             f"The order of steps_list is not consistent with io map! Maybe {sorted_steps} ?"
                         )
             pre_set.add(step_name)
+
+    def check_templates(self):
+        import re
+        for step_name, template in self.templates.items():
+            assert isinstance(template, OPTemplate)
+            assert re.match(r"^[a-zA-Z0-9\-]*$", template.name) is not None, \
+                f"Template name '{template.name}' of step '{step_name}' is invalid!"
 
     @classmethod
     def sort_steps_list(cls):
