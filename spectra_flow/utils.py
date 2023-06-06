@@ -43,11 +43,14 @@ def load_json(path: Union[str, Path]):
         setting = json.load(f)
     return setting
 
-def bohrium_login(account_config: dict = None):
+def bohrium_login(account_config: dict = None, debug: bool = False):
     from dflow import config, s3_config
     from dflow.plugins import bohrium
     from dflow.plugins.bohrium import TiefblueClient
     from getpass import getpass
+    if debug:
+        config["mode"] = "debug"
+        return 
     config["host"] = "https://workflows.deepmodeling.com"
     config["k8s_api_server"] = "https://workflows.deepmodeling.com"
     config["dispatcher_image_pull_policy"] = "IfNotPresent"
