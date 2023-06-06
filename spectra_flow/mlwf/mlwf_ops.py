@@ -254,8 +254,7 @@ class CollectWFC(OP, abc.ABC):
                 except Exception as e:
                     print(f"[ERROR] Failed to read results of frame {frame:06d}: {e}")
                     failed_frames.append(frame)
-        if len(success_frames) == 0:
-            raise RuntimeError("All frames failed!")
+        assert len(success_frames) > 0, "All frames failed!"
         final_confs = conf_sys.sub_system(success_frames)
         for key in total_wfc:
             total_wfc[key] = total_wfc[key][success_frames]
