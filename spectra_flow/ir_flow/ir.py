@@ -62,7 +62,7 @@ def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False)
         if "md" in run_tree[end_step] and (not run_md):
             raise AssertionError("'run_md' in run_config is False, but MD is necessary!")
         run_list = [IRflow.main_steps[i] for i in range(start_i, end_i + 1)]
-        if "predict" in run_list and run_md:
+        if "predict_dipole" in run_list and run_md:
             run_list += ["md"]
     else:
         if "end_step" in run_config:
@@ -126,19 +126,19 @@ class IRflow(AdaptiveFlow):
         "dipole": DipoleSteps, 
         "train_wann": DWannTrain, 
         "md": DpLmpSample, 
-        "predict": PredictSteps, 
+        "predict_dipole": PredictSteps, 
         "cal_ir": CalIR
     }
-    steps_list = ["dipole", "train_wann", "md", "predict", "cal_ir"]
-    parallel_steps = [["dipole"], ["train_wann", "md"], ["predict"], ["cal_ir"]]
-    main_steps = ["dipole", "train_wann", "predict", "cal_ir"]
+    steps_list = ["dipole", "train_wann", "md", "predict_dipole", "cal_ir"]
+    parallel_steps = [["dipole"], ["train_wann", "md"], ["predict_dipole"], ["cal_ir"]]
+    main_steps = ["dipole", "train_wann", "predict_dipole", "cal_ir"]
     @classmethod
     def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
         this = StepKey()
         dipole = StepKey("dipole")
         train_wann = StepKey("train_wann")
         md = StepKey("md")
-        predict = StepKey("predict")
+        predict_dipole = StepKey("predict_dipole")
         return {
             "dipole": {
                 "mlwf_setting": [this.mlwf_setting],
@@ -160,7 +160,7 @@ class IRflow(AdaptiveFlow):
                 "init_conf": [this.init_conf],
                 "dp_model": [this.dp_model],
             },
-            "predict": {
+            "predict_dipole": {
                 "dp_setting": [this.dwann_setting],
                 "sampled_system": [this.sampled_system, md.sampled_system],
                 "sys_fmt": [this.sys_fmt, md.sys_fmt],
@@ -169,7 +169,7 @@ class IRflow(AdaptiveFlow):
             },
             "cal_ir": {
                 "global": [this.global_config],
-                "total_dipole": [predict.total_tensor, this.total_dipole],
+                "total_dipole": [predict_dipole.total_tensor, this.total_dipole],
             }
         }
 
@@ -247,7 +247,7 @@ class IRflow(AdaptiveFlow):
             self.upload_python_packages
         )
         return DipoleSteps(
-            "Cal-Dipole",
+            "cal-dipole",
             mlwf_template,
             self.executors["cal"],
             self.upload_python_packages
@@ -269,7 +269,7 @@ class IRflow(AdaptiveFlow):
     
     def build_predict_temp(self):
         return PredictSteps(
-            "predict",
+            "predict-dipole",
             "dipole",
             self.executors["predict"],
             self.executors["cal"],
@@ -303,7 +303,7 @@ if __name__ == "__main__":
         },
     )
     IRflow.check_steps_list()
-    flow = IRflow(
+    ir_template = IRflow(
         "ir", 
         {
             "start_step": "dipole", 
@@ -320,4 +320,23 @@ if __name__ == "__main__":
             "deepmd_lammps": ex,
         },
         debug = True
+    )
+    ir_step = Step(
+        "test",
+        ir_template,
+        parameters = {
+            "train_conf_fmt": {},
+            "dwann_setting": {},
+            "global_config": {},
+            "mlwf_setting": {},
+            "task_setting": {},
+            "init_conf_fmt": {}
+        },
+        artifacts = {
+            "train_confs": "",
+            "pseudo": "",
+            "cal_dipole_python": "",
+            "init_conf": "",
+            "dp_model": "",
+        }
     )

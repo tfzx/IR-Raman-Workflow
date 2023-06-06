@@ -62,7 +62,7 @@ def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False)
         if "md" in run_tree[end_step] and (not run_md):
             raise AssertionError("'run_md' in run_config is False, but MD is necessary!")
         run_list = [RamanFlow.main_steps[i] for i in range(start_i, end_i + 1)]
-        if "predict" in run_list and run_md:
+        if "predict_polar" in run_list and run_md:
             run_list += ["md"]
     else:
         if "end_step" in run_config:
@@ -126,19 +126,19 @@ class RamanFlow(AdaptiveFlow):
         "polar": PolarSteps, 
         "train_polar": DPolarTrain, 
         "md": DpLmpSample, 
-        "predict": PredictSteps, 
+        "predict_polar": PredictSteps, 
         "cal_raman": CalRaman
     }
-    steps_list = ["polar", "train_polar", "md", "predict", "cal_raman"]
-    parallel_steps = [["polar"], ["train_polar", "md"], ["predict"], ["cal_raman"]]
-    main_steps = ["polar", "train_polar", "predict", "cal_raman"]
+    steps_list = ["polar", "train_polar", "md", "predict_polar", "cal_raman"]
+    parallel_steps = [["polar"], ["train_polar", "md"], ["predict_polar"], ["cal_raman"]]
+    main_steps = ["polar", "train_polar", "predict_polar", "cal_raman"]
     @classmethod
     def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
         this = StepKey()
         polar = StepKey("polar")
         train_polar = StepKey("train_polar")
         md = StepKey("md")
-        predict = StepKey("predict")
+        predict_polar = StepKey("predict_polar")
         return {
             "polar": {
                 "polar_setting": [this.polar_setting],
@@ -161,7 +161,7 @@ class RamanFlow(AdaptiveFlow):
                 "init_conf": [this.init_conf],
                 "dp_model": [this.dp_model],
             },
-            "predict": {
+            "predict_polar": {
                 "dp_setting": [this.dp_setting],
                 "sampled_system": [this.sampled_system, md.sampled_system],
                 "sys_fmt": [this.sys_fmt, md.sys_fmt],
@@ -170,7 +170,7 @@ class RamanFlow(AdaptiveFlow):
             },
             "cal_raman": {
                 "global": [this.global_config],
-                "total_polar": [this.total_polar, predict.total_tensor],
+                "total_polar": [this.total_polar, predict_polar.total_tensor],
             }
         }
 
@@ -271,7 +271,7 @@ class RamanFlow(AdaptiveFlow):
     
     def build_predict_temp(self):
         return PredictSteps(
-            "predict",
+            "predict_polar",
             "polar",
             self.executors["predict"],
             self.executors["cal"],
