@@ -146,7 +146,7 @@ class IODictHandler:
     
     def from_self(self, step_name, in_key, _inputs, run_set):
         for self_in_key in self.io_from_self[step_name][in_key]:
-            if (self.given_inputs is None) or (self_in_key in self.given_inputs) or is_optional(_inputs):
+            if is_optional(_inputs) or (self.given_inputs is None) or (self_in_key in self.given_inputs):
                 return (None, self_in_key)
     
     def from_step(self, step_name, in_key, _inputs, run_set):
