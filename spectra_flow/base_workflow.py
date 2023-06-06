@@ -529,6 +529,25 @@ class AdaptiveFlow(Steps, abc.ABC):
                         )
             pre_set.add(step_name)
 
+    @classmethod
+    def check_steps(cls):
+        assert set(cls.steps_list) == set(cls.all_steps.keys())
+        if len(cls.parallel_steps) > 0:
+            sumof_parallel = sum(cls.parallel_steps, [])
+            assert len(sumof_parallel) == len(cls.steps_list)
+            assert set(sumof_parallel) == set(cls.steps_list)
+
+    @classmethod
+    def check_io_dict(cls):
+        inputs_dict = cls.get_substeps_inputs()
+        io_dict = cls.get_io_dict()
+        assert set(io_dict.keys()) == set(cls.steps_list)
+        for step_name in cls.steps_list:
+            steps = cls.all_steps[step_name]
+            for in_key in inputs_dict[steps]:
+                assert in_key in io_dict[step_name]
+                assert len(io_dict[step_name][in_key]) > 0
+
     def check_templates(self):
         import re
         for step_name, template in self.templates.items():
