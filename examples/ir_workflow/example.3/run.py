@@ -13,8 +13,8 @@ if __name__ == "__main__":
 
     # 4 steps: dipole, train, predict, cal_ir
     run_config = {
-        "start_step": "train",
-        "end_step": "train"
+        "start_step": "train_wann",
+        "end_step": "train_wann"
     }
     ir_step = build_ir("ir-example3", load_json("parameters.json"), load_json("../machine.json"), run_config)
     wf = Workflow("ir-workflow")

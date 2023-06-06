@@ -124,19 +124,19 @@ def build_ir(
 class IRflow(AdaptiveFlow):
     all_steps = {
         "dipole": DipoleSteps, 
-        "train": DWannTrain, 
+        "train_wann": DWannTrain, 
         "md": DpLmpSample, 
         "predict": PredictSteps, 
         "cal_ir": CalIR
     }
-    steps_list = ["dipole", "train", "md", "predict", "cal_ir"]
-    parallel_steps = [["dipole"], ["train", "md"], ["predict"], ["cal_ir"]]
-    main_steps = ["dipole", "train", "predict", "cal_ir"]
+    steps_list = ["dipole", "train_wann", "md", "predict", "cal_ir"]
+    parallel_steps = [["dipole"], ["train_wann", "md"], ["predict"], ["cal_ir"]]
+    main_steps = ["dipole", "train_wann", "predict", "cal_ir"]
     @classmethod
     def get_io_dict(cls) -> Dict[str, Dict[str, List[StepKeyPair]]]:
         this = StepKey()
         dipole = StepKey("dipole")
-        train = StepKey("train")
+        train_wann = StepKey("train_wann")
         md = StepKey("md")
         predict = StepKey("predict")
         return {
@@ -148,7 +148,7 @@ class IRflow(AdaptiveFlow):
                 "pseudo": [this.pseudo],
                 "cal_dipole_python": [this.cal_dipole_python],
             },
-            "train": {
+            "train_wann": {
                 "conf_fmt": [this.train_conf_fmt],
                 "confs": [this.train_confs],
                 "dp_setting": [this.dp_setting],
@@ -164,7 +164,7 @@ class IRflow(AdaptiveFlow):
                 "dp_setting": [this.dp_setting],
                 "sampled_system": [this.sampled_system, md.sampled_system],
                 "sys_fmt": [this.sys_fmt, md.sys_fmt],
-                "frozen_model": [this.dwann_model, train.frozen_model],
+                "frozen_model": [this.dwann_model, train_wann.frozen_model],
                 "cal_dipole_python": [this.cal_dipole_python],
             },
             "cal_ir": {
@@ -187,7 +187,7 @@ class IRflow(AdaptiveFlow):
         self.run_config = run_config
         self.executors = executors
         self.python_op_executor = {
-            "train": self.executors["train"],
+            "train_wann": self.executors["train"],
             "md": self.executors["deepmd_lammps"],
             "cal_ir": self.executors["cal"],
         }
