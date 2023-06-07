@@ -39,7 +39,7 @@ class PrepareQeWann(Prepare):
                 pass
         return rewrite_atoms, rewrite_proj
 
-    def get_writers(self, mlwf: MLWFReaderQeW90, confs: dpdata.System, wc_python: ModuleType):
+    def get_writers(self, mlwf: MLWFReaderQeW90, confs: dpdata.System, wc_python: Optional[ModuleType]):
         w90_params_dict = mlwf.get_w90_params_dict()
         scf_grid, nscf_grid = mlwf.get_kgrid()
         w90_kgrid = nscf_grid if mlwf.run_nscf else scf_grid
@@ -74,12 +74,11 @@ class PrepareQeWann(Prepare):
                     rewrite_atoms, rewrite_proj # type: ignore
                 )
 
-    def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: ModuleType):
+    def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: Optional[ModuleType]):
         """
             Each dir runs one qe calculations (scf+[nscf]) and some wannier90 calculations.
         """
         mlwf = MLWFReaderQeW90(mlwf_setting, if_copy = False)
-        mlwf.default()
         self.scf_writers: Dict[str, QeParamsConfs] = {}
         if mlwf.run_nscf:
             self.nscf_writers: Dict[str, QeParamsConfs] = {}

@@ -1,5 +1,9 @@
+from pathlib import Path
+import numpy as np
 from spectra_flow.SuperOP.mlwf_reader import MLWFReaderQeW90
-import unittest, shutil, os
+from spectra_flow.mlwf.qe_wannier90 import PrepareQeWann, RunQeWann, CollectWann
+import unittest, shutil, os, imp
+from spectra_flow.utils import read_conf
 
 class TestReader(unittest.TestCase):
     def test_default(self):
@@ -55,3 +59,39 @@ class TestReader(unittest.TestCase):
             mlwf.get_qe_params_dict(),
             {"ori": mlwf.scf_params}
         )
+
+
+class TestPrepareQeW90(unittest.TestCase):
+    def setUp(self) -> None:
+        self.confs = Path("tests/data.qe/test.004/uploads/system/train_confs").absolute()
+        self.conf_fmt = {
+            "fmt": "deepmd/npy",
+            "type_map": ["O", "H"]
+        }
+        self.wc_python_path = Path("tests/data.qe/test.004/cal_dipole.py").absolute()
+        self.wc_python = imp.load_source("wc_python", str(self.wc_python_path))
+        self.work_dir = Path("tests/tmp")
+        self.work_dir.mkdir()
+        self.last_cwd = os.getcwd()
+        os.chdir(self.work_dir)
+        return super().setUp()
+    
+    def tearDown(self) -> None:
+        os.chdir(self.last_cwd)
+        if self.work_dir.is_dir():
+            shutil.rmtree(self.work_dir)
+        return super().tearDown()
+    
+    def test_rewriter(self):
+        prepare = PrepareQeWann()
+        rewrite_atoms, rewrite_proj = prepare.get_w90_rewriter(self.wc_python)
+        conf_sys = read_conf(self.confs, self.conf_fmt)
+        atoms2 = self.wc_python.rewrite_atoms(conf_sys)
+        proj2 = self.wc_python.rewrite_proj(conf_sys)
+        atoms = rewrite_atoms(conf_sys) # type: ignore
+        proj = rewrite_proj(conf_sys)   # type: ignore
+        self.assert_(isinstance(atoms, np.ndarray)) 
+        self.assert_((atoms == "C1").all())
+        self.assert_((atoms == atoms2).all())
+        self.assertDictEqual(proj, {"C1": "sp2"})
+        self.assertDictEqual(proj, proj2)
