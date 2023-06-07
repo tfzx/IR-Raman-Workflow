@@ -52,7 +52,7 @@ class Prepare(OP, abc.ABC):
         pseudo: Path = op_in["pseudo"]
         if op_in["cal_dipole_python"]:
             import imp
-            wc_python = imp.load_source("dipole_module", str(op_in["cal_dipole_python"]))
+            wc_python = imp.load_source("wc_python", str(op_in["cal_dipole_python"]))
         else:
             wc_python = None
 
