@@ -96,15 +96,10 @@ class TestIRflow(unittest.TestCase):
             {"predict_dipole"}
         )
     
-    def test_build_01(self):
+    def run_build(self, run_config: dict):
         ir_template = IRflow(
             "ir", 
-            {
-                "start_step": "dipole", 
-                "end_step": "cal_ir", 
-                "dft_type": "qe",
-                "run_md": True
-            },
+            run_config = run_config,
             executors = {
                 "base": None,
                 "run": None,
@@ -117,6 +112,16 @@ class TestIRflow(unittest.TestCase):
         )
         in_p = ir_template.input_parameters
         in_a = ir_template.input_artifacts
+        return in_p, in_a
+
+    def test_build_01(self):
+        run_config = {
+            "start_step": "dipole", 
+            "end_step": "cal_ir", 
+            "dft_type": "qe",
+            "run_md": True
+        }
+        in_p, in_a = self.run_build(run_config)
         self.assertSetEqual(
             set(in_p.keys()), {
                 "mlwf_setting",
@@ -139,26 +144,13 @@ class TestIRflow(unittest.TestCase):
         self.assert_(in_a["cal_dipole_python"].optional)
 
     def test_build_02(self):
-        ir_template = IRflow(
-            "ir", 
-            {
-                "start_step": "dipole", 
-                "end_step": "cal_ir", 
-                "dft_type": "qe",
-                "run_md": False
-            },
-            executors = {
-                "base": None,
-                "run": None,
-                "cal": None,
-                "train": None,
-                "predict": None,
-                "deepmd_lammps": None,
-            },
-            debug = True
-        )
-        in_p = ir_template.input_parameters
-        in_a = ir_template.input_artifacts
+        run_config = {
+            "start_step": "dipole", 
+            "end_step": "cal_ir", 
+            "dft_type": "qe",
+            "run_md": False
+        }
+        in_p, in_a = self.run_build(run_config)
         self.assertSetEqual(
             set(in_p.keys()), {
                 "mlwf_setting",
