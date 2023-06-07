@@ -42,7 +42,7 @@ class PrepareQeWann(Prepare):
     def get_writers(self, mlwf: MLWFReaderQeW90, confs: dpdata.System, wc_python: ModuleType):
         w90_params_dict = mlwf.get_w90_params_dict()
         scf_grid, nscf_grid = mlwf.get_kgrid()
-        w90_kgrid = nscf_grid if nscf_grid else scf_grid
+        w90_kgrid = nscf_grid if mlwf.run_nscf else scf_grid
         nscf_params = mlwf.nscf_params
         pw2wan_params = mlwf.pw2wan_params
         atomic_species = mlwf.atomic_species
@@ -57,7 +57,8 @@ class PrepareQeWann(Prepare):
                 nscf_params, atomic_species, mlwf.run_nscf
             )
             self.scf_writers[qe_key] = scf_writer
-            if nscf_writer:
+            if mlwf.run_nscf:
+                assert nscf_writer is not None
                 self.nscf_writers[qe_key] = nscf_writer
             
             self.pw2wan_writers[qe_key] = {}

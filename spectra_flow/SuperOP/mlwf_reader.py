@@ -144,7 +144,7 @@ class MLWFReaderQeW90:
             w90_params_dict = multi_w90_params
         return w90_params_dict
     
-    def get_kgrid(self) -> Tuple[Tuple[int, int, int], Optional[Tuple[int, int, int]]]:
+    def get_kgrid(self) -> Tuple[Tuple[int, int, int], Tuple[int, int, int]]:
         _scf_grid = None; _nscf_grid = None
         dft_params = self.dft_params
         _scf_grid = dft_params.get("k_grid", None)
@@ -154,12 +154,12 @@ class MLWFReaderQeW90:
             if "nscf_grid" in self.mlwf_setting["kmesh"]:
                 _nscf_grid = self.mlwf_setting["kmesh"]["nscf_grid"] # type: ignore
         scf_grid: Optional[Tuple[int, int, int]] = None
-        nscf_grid: Optional[Tuple[int, int, int]] = None
         if _scf_grid is not None:
             scf_grid = tuple(_scf_grid) # type: ignore
-        if _nscf_grid is None:
-            nscf_grid = scf_grid
         assert scf_grid is not None
+        nscf_grid: Tuple[int, int, int] = scf_grid
+        if _nscf_grid is not None:
+            nscf_grid = tuple(_nscf_grid) # type: ignore
         return scf_grid, nscf_grid
 
     def get_qe_params_dict(self):
