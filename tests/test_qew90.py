@@ -19,7 +19,7 @@ class TestReader(unittest.TestCase):
         self.assert_(not mlwf.with_efield)
         self.assert_(mlwf.efields is None)
         self.assert_(mlwf.ef_type == "enthalpy")
-        self.assertTupleEqual(mlwf.get_kgrid(), (None, None))
+        self.assertRaises(AssertionError, mlwf.get_kgrid)
         self.assertDictEqual(
             mlwf.get_w90_params_dict(),
             {"": mlwf.w90_params}
@@ -46,7 +46,7 @@ class TestReader(unittest.TestCase):
         self.assert_(not mlwf.with_efield)
         self.assert_(mlwf.efields is None)
         self.assert_(mlwf.ef_type == "enthalpy")
-        self.assertTupleEqual(mlwf.get_kgrid(), (None, None))
+        self.assertRaises(AssertionError, mlwf.get_kgrid)
         self.assertDictEqual(
             mlwf.get_w90_params_dict(),
             {"": mlwf.w90_params}
