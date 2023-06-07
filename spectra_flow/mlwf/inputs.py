@@ -11,28 +11,28 @@ class QeInputs(abc.ABC):
         pass
 
     @abc.abstractmethod
-    def write(frame: int) -> str:
+    def write(self, frame: int) -> str:
         pass
 
     @classmethod
-    def write_configuration(cls, conf: dpdata.System, atoms: np.ndarray = None):
+    def write_configuration(cls, conf: dpdata.System, atoms: Optional[np.ndarray] = None):
         if atoms is None:
-            atoms = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]]
-        cells = np.reshape(conf["cells"], (3, 3))
-        coords = np.reshape(conf["coords"], (-1, 3))
+            atoms = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]] # type: ignore
+        cells = np.reshape(conf["cells"], (3, 3)) # type: ignore
+        coords = np.reshape(conf["coords"], (-1, 3)) # type: ignore
         with TemporaryFile("w+") as f:
             f.write("\nCELL_PARAMETERS { angstrom }\n")
             np.savetxt(f, cells, fmt = "%15.8f")
             f.write("\nATOMIC_POSITIONS { angstrom }\n")
-            atomic_positions = np.concatenate([atoms, np.char.mod("%15.8f", coords)], axis = 1)
+            atomic_positions = np.concatenate([atoms, np.char.mod("%15.8f", coords)], axis = 1) # type: ignore
             np.savetxt(f, atomic_positions, fmt = "%s")
             f.seek(0)
             conf_str = f.read()
         return conf_str
     
     @classmethod
-    def write_parameters(cls, input_params: dict, atomic_species: dict = None, 
-                          kpoints: dict = None, optional_input: str = None):
+    def write_parameters(cls, input_params: dict, atomic_species: Optional[dict] = None, 
+                          kpoints: Optional[dict] = None, optional_input: Optional[str] = None):
         with TemporaryFile("w+") as f:
             for key, val in input_params.items():
                 if val is None or len(val) == 0:
@@ -74,15 +74,15 @@ class QeInputs(abc.ABC):
         return params_str
 
 class QeParamsConfs(QeInputs):
-    def __init__(self, input_params: Dict[str, dict], kpoints: dict, 
-                 atomic_species: dict, confs: dpdata.System, optional_input: str = None) -> None:
+    def __init__(self, input_params: Dict[str, Optional[dict]], kpoints: Optional[dict], 
+                 atomic_species: dict, confs: dpdata.System, optional_input: Optional[str] = None) -> None:
         super().__init__()
         """
         Automatically complemant the system info("ntyp" and "nat") to input parmeters, and generate the kpoints by calculation type. 
         If cal = "scf", then kpoints will be "automatic". Otherwise kpoints will be "crystal" type. 
         """
         self.params_str = self.write_parameters(input_params, atomic_species, kpoints, optional_input)
-        self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]]
+        self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]] # type: ignore
         self.confs = confs
 
     def write(self, frame: int):
@@ -103,8 +103,8 @@ class Wannier90Inputs:
             proj: Optional[Union[Dict[str, str], List[str]]], 
             kpoints: np.ndarray, 
             confs: dpdata.System, 
-            rewrite_atoms: Callable[[dpdata.System], np.ndarray] = None,
-            rewrite_proj: Callable[[dpdata.System], Dict[str, str]] = None
+            rewrite_atoms: Optional[Callable[[dpdata.System], np.ndarray]] = None,
+            rewrite_proj: Optional[Callable[[dpdata.System], Dict[str, str]]] = None
         ) -> None:
         self.params_str = self.write_parameters(wan_params)
         self.kpoints_str = self.write_kpoints(kpoints)
@@ -115,7 +115,7 @@ class Wannier90Inputs:
         else:
             self.proj_str = ""
         if rewrite_atoms is None:
-            self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]]
+            self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]] # type: ignore
         else:
             self.rewrite_atoms = rewrite_atoms
         self.confs = confs
@@ -133,18 +133,18 @@ class Wannier90Inputs:
         return "\n".join([self.params_str, self.kpoints_str, proj_str, self.write_configuration(conf, atoms)])
 
     @classmethod
-    def write_configuration(cls, conf: dpdata.System, atoms: np.ndarray = None):
+    def write_configuration(cls, conf: dpdata.System, atoms: Optional[np.ndarray] = None):
         if atoms is None:
-            atoms = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]]
-        cells = np.reshape(conf["cells"], (3, 3))
-        coords = np.reshape(conf["coords"], (-1, 3))
+            atoms = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]] # type: ignore
+        cells = np.reshape(conf["cells"], (3, 3)) # type: ignore
+        coords = np.reshape(conf["coords"], (-1, 3)) # type: ignore
         with TemporaryFile("w+") as f:
             f.write("\nbegin unit_cell_cart\n")
             f.write("Ang\n")
             np.savetxt(f, cells, fmt = "%15.8f")
             f.write("end unit_cell_cart\n")
             f.write("\nbegin atoms_cart\n")
-            atomic_positions = np.concatenate([atoms, np.char.mod("%15.8f", coords)], axis = 1)
+            atomic_positions = np.concatenate([atoms, np.char.mod("%15.8f", coords)], axis = 1) # type: ignore
             np.savetxt(f, atomic_positions, fmt = "%s")
             f.write("end atoms_cart\n")
             f.seek(0)
@@ -193,7 +193,7 @@ class Wannier90Inputs:
 
 
 
-def complete_qe(input_params: Dict[str, dict], calculation: Optional[str] = None, 
+def complete_qe(input_params: Dict[str, Optional[dict]], calculation: Optional[str] = None, 
                 k_grid: Optional[Tuple[int, int, int]] = None, 
                 confs: Optional[dpdata.System] = None):
     input_params_default: Dict[str, dict] = {}
@@ -209,7 +209,7 @@ def complete_qe(input_params: Dict[str, dict], calculation: Optional[str] = None
     input_params = complete_by_default(input_params, input_params_default, if_copy = True)
     kpoints = None
     if k_grid:
-        calculation = input_params["control"]["calculation"]
+        calculation = input_params["control"]["calculation"] # type: ignore
         if calculation == "scf":
             kpoints = {
                 "type": "automatic",
@@ -255,9 +255,9 @@ def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int
 
 def get_qe_writers(
         confs: dpdata.System,
-        scf_grid: List[int],
-        nscf_grid: List[int],
-        scf_params: Dict[str, dict],
+        scf_grid: Optional[Tuple[int, int, int]],
+        nscf_grid: Optional[Tuple[int, int, int]],
+        scf_params: Dict[str, Optional[dict]],
         nscf_params: Optional[Dict[str, dict]],
         atomic_species: Dict[str, Dict[str, Union[str, float]]],
         run_nscf: bool = True
@@ -269,7 +269,7 @@ def get_qe_writers(
         _nscf_params = deepcopy(scf_params)
         if nscf_params is not None:
             recurcive_update(_nscf_params, nscf_params)
-        _nscf_params["control"]["restart_mode"] = "from_scratch"
+        _nscf_params["control"]["restart_mode"] = "from_scratch"  # type: ignore
         input_nscf, kpoints_nscf = complete_qe(_nscf_params, "nscf", nscf_grid, confs)
         nscf_writer = QeParamsConfs(input_nscf, kpoints_nscf, atomic_species, confs)
     return scf_writer, nscf_writer, input_scf, input_nscf
@@ -279,9 +279,9 @@ def get_pw_w90_writers(
         confs: dpdata.System,
         pw2wan_params: Dict[str, dict], 
         w90_params: Dict[str, dict],
-        kgrid: List[int],
-        input_scf: Dict[str, dict], 
-        input_nscf: Optional[Dict[str, dict]],
+        kgrid: Tuple[int, int, int],
+        input_scf: Dict[str, Optional[dict]], 
+        input_nscf: Optional[Dict[str, Optional[dict]]],
         rewrite_atoms: Callable[[dpdata.System], np.ndarray],
         rewrite_proj: Callable[[dpdata.System], Dict[str, str]]
     ):
@@ -292,32 +292,32 @@ def get_pw_w90_writers(
 def get_pw2wan_writer(
         seed_name: str,
         pw2wan_params: Dict[str, dict], 
-        input_scf: Dict[str, dict], 
+        input_scf: Dict[str, Optional[dict]], 
     ):
     input_pw2wan = complete_pw2wan(
         pw2wan_params, 
         seed_name, 
-        input_scf["control"]["prefix"],
-        input_scf["control"]["outdir"]
+        input_scf["control"]["prefix"], # type: ignore
+        input_scf["control"]["outdir"]  # type: ignore
     )
     return QeParams(input_pw2wan)
 
 def get_w90_writer(
         confs: dpdata.System,
         w90_params: Dict[str, dict],
-        scf_params: Dict[str, dict],
-        nscf_params: Optional[Dict[str, dict]],
-        kgrid: List[int],
-        rewrite_atoms: Callable[[dpdata.System], np.ndarray],
-        rewrite_proj: Callable[[dpdata.System], Dict[str, str]]
+        scf_params: Dict[str, Optional[dict]],
+        nscf_params: Optional[Dict[str, Optional[dict]]],
+        kgrid: Tuple[int, int, int],
+        rewrite_atoms: Optional[Callable[[dpdata.System], np.ndarray]],
+        rewrite_proj: Optional[Callable[[dpdata.System], Dict[str, str]]]
     ):
     wan_params = w90_params["wan_params"]
     if nscf_params is not None:
-        if "system" in nscf_params and "nbnd" in nscf_params["system"]:
-            wan_params["num_bands"] = nscf_params["system"]["nbnd"]
+        if "system" in nscf_params and "nbnd" in nscf_params["system"]: # type: ignore
+            wan_params["num_bands"] = nscf_params["system"]["nbnd"] # type: ignore
     else:
-        if "system" in scf_params and "nbnd" in scf_params["system"]:
-            wan_params["num_bands"] = scf_params["system"]["nbnd"]
+        if "system" in scf_params and "nbnd" in scf_params["system"]: # type: ignore
+            wan_params["num_bands"] = scf_params["system"]["nbnd"] # type: ignore
     wan_params, proj, kpoints = complete_wannier90(
         wan_params, 
         w90_params.get("projections", {}),

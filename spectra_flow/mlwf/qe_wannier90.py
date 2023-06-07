@@ -1,6 +1,6 @@
 import shutil
 from types import ModuleType
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 from pathlib import Path
 import dpdata, numpy as np
 from dflow.utils import set_directory
@@ -26,7 +26,7 @@ class PrepareQeWann(Prepare):
             - `{name}.win`
     """
     @classmethod
-    def get_w90_rewriter(cls, wc_python: ModuleType = None):
+    def get_w90_rewriter(cls, wc_python: Optional[ModuleType] = None):
         rewrite_atoms = None; rewrite_proj = None
         if wc_python is not None:
             try:
@@ -42,7 +42,7 @@ class PrepareQeWann(Prepare):
     def get_writers(self, mlwf: MLWFReaderQeW90, confs: dpdata.System, wc_python: ModuleType):
         w90_params_dict = mlwf.get_w90_params_dict()
         scf_grid, nscf_grid = mlwf.get_kgrid()
-        w90_kgrid = nscf_grid if mlwf.run_nscf else scf_grid
+        w90_kgrid = nscf_grid if nscf_grid else scf_grid
         nscf_params = mlwf.nscf_params
         pw2wan_params = mlwf.pw2wan_params
         atomic_species = mlwf.atomic_species
@@ -57,7 +57,7 @@ class PrepareQeWann(Prepare):
                 nscf_params, atomic_species, mlwf.run_nscf
             )
             self.scf_writers[qe_key] = scf_writer
-            if mlwf.run_nscf:
+            if nscf_writer:
                 self.nscf_writers[qe_key] = nscf_writer
             
             self.pw2wan_writers[qe_key] = {}
@@ -70,7 +70,7 @@ class PrepareQeWann(Prepare):
                     mlwf.seed_name(qe_key, w90_key), 
                     confs, pw2wan_params, w90_params, 
                     w90_kgrid, input_scf, input_nscf,
-                    rewrite_atoms, rewrite_proj
+                    rewrite_atoms, rewrite_proj # type: ignore
                 )
 
     def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: ModuleType):
@@ -91,7 +91,7 @@ class PrepareQeWann(Prepare):
     def prep_one_frame(self, frame: int):
         seed_name = self.mlwf.seed_name
         for qe_key in self.scf_writers:
-            with set_directory(qe_key, mkdir = True):
+            with set_directory(qe_key, mkdir = True): # type: ignore
                 Path(f"scf_{qe_key}.in").write_text(self.scf_writers[qe_key].write(frame))
                 if self.mlwf.run_nscf:
                     Path(f"nscf_{qe_key}.in").write_text(self.nscf_writers[qe_key].write(frame))
@@ -112,13 +112,13 @@ class RunQeWann(RunMLWF):
     
     def run_one_subtask(
             self, qe_key, back: Path, out_dir: Path, 
-            copy_out: bool = False, tar_dir: Path = None
+            copy_out: bool = False, tar_dir: Optional[Path] = None
         ):
         mlwf = self.mlwf
         scf_name = mlwf.scf_name(qe_key)
         nscf_name = mlwf.nscf_name(qe_key)
         self.run(" ".join([self.pw_cmd, "-input", scf_name]))
-        if copy_out:
+        if copy_out and tar_dir:
             shutil.copytree(out_dir, tar_dir)
         if Path(nscf_name).exists():
             self.run(" ".join([self.pw_cmd, "-input", nscf_name]))
@@ -132,23 +132,22 @@ class RunQeWann(RunMLWF):
 
     def run_one_frame(self, backward_dir: Path):
         mlwf = self.mlwf
-        out_dir = Path(mlwf.scf_params["control"]["outdir"])
+        out_dir = Path(mlwf.scf_params["control"]["outdir"]) # type: ignore
         ori_out_dir = Path("ori_out_temp").absolute()
         ori_p = Path("ori")
         back_abs = backward_dir.absolute()
 
         with_ef = mlwf.with_efield
-        if with_ef:
-            ef_type = mlwf.ef_type
+        ef_type = mlwf.ef_type
 
         with set_directory(ori_p):
             self.run_one_subtask(
                 "ori", back_abs, out_dir, with_ef and ef_type == "enthalpy", ori_out_dir
             )
         if with_ef:
-            for ef_name in mlwf.efields:
+            for ef_name in mlwf.efields: # type: ignore
                 qe_key = f"ef_{ef_name}"
-                with set_directory(qe_key):
+                with set_directory(qe_key): # type: ignore
                     if ef_type == "enthalpy":
                         shutil.copytree(ori_out_dir, out_dir)
                     self.run_one_subtask(qe_key, back_abs, out_dir)

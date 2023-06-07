@@ -19,12 +19,12 @@ if __name__ == "__main__":
     base_executor = get_executor(machine_config["executors"]["base"])
     run_executor = get_executor(machine_config["executors"]["run"])
     cal_executor = get_executor(machine_config["executors"]["cal"])
-
+    # use OPs in mlwf.qe_wannier90
     mlwf_template = MLWFSteps(
         name = "MLWF-Qe",
-        prepare_op = PrepareQeWann, # use OPs in mlwf.qe_wannier90
-        run_op = RunQeWann,
-        collect_op = CollectWann,
+        prepare_op = PrepareQeWann,     # type: ignore
+        run_op = RunQeWann,             # type: ignore
+        collect_op = CollectWann,       # type: ignore
         prepare_executor = base_executor,
         run_executor = run_executor
     )
@@ -50,14 +50,14 @@ if __name__ == "__main__":
             }
         },
         artifacts = {
-            "confs": upload_artifact("./data"),
-            "pseudo": upload_artifact("./pseudo"),
+            "confs": upload_artifact("./data"),     # type: ignore
+            "pseudo": upload_artifact("./pseudo"),  # type: ignore
             # Optional, upload the python file to calculate wannier centroid.
-            "cal_dipole_python": upload_artifact(spectra_flow.post.cal_dipole.__file__)
+            "cal_dipole_python": upload_artifact("cal_dipole.py")   # type: ignore
         }
     )
 
-    wf = Workflow("cal-polar-workflow")
+    wf = Workflow("cal-polar-workflow") # type: ignore
     wf.add(cal_polar_step)
     wf.submit()
     while wf.query_status() in ["Pending", "Running"]:
@@ -65,6 +65,6 @@ if __name__ == "__main__":
     assert(wf.query_status() == "Succeeded")
 
     step = wf.query_step("Polar-Step")[0]
-    download_artifact(step.outputs.artifacts["wannier_function_centers"], path="./back")
-    download_artifact(step.outputs.artifacts["wannier_centroid"], path="./back")
-    download_artifact(step.outputs.artifacts["polarizability"], path="./back")
+    download_artifact(step.outputs.artifacts["wannier_function_centers"], path="./back")    # type: ignore
+    download_artifact(step.outputs.artifacts["wannier_centroid"], path="./back")            # type: ignore
+    download_artifact(step.outputs.artifacts["polarizability"], path="./back")              # type: ignore

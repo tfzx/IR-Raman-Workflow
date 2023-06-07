@@ -6,7 +6,7 @@ def model_eval(model, smp_sys: dpdata.System, set_size: int = 128) -> np.ndarray
     coord = smp_sys["coords"]
     cell = smp_sys["cells"]
     atype = smp_sys["atom_types"]
-    nframes = coord.shape[0]
+    nframes = coord.shape[0] # type: ignore
     batch = 0
     out_all = []
     while batch < nframes:

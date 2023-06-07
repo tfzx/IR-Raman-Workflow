@@ -12,7 +12,7 @@ def calculate_corr_polar(polar: np.ndarray, window: int):
     diag[:, 0, 0] = polar_iso
     diag[:, 1, 1] = polar_iso
     diag[:, 2, 2] = polar_iso
-    polar_aniso = polar - diag
+    polar_aniso = polar - diag # type: ignore
 
     polar_iso -= np.mean(polar_iso, axis = 0, keepdims = True)
     polar_aniso -= np.mean(polar_aniso, axis = 0, keepdims = True)
@@ -23,7 +23,7 @@ def calculate_corr_polar(polar: np.ndarray, window: int):
     corr_aniso *= 2 / 15
     return corr_iso, corr_aniso
 
-def calculate_raman(corr: np.ndarray, width: int, dt_ps: float, temperature: float):
+def calculate_raman(corr: np.ndarray, width: float, dt_ps: float, temperature: float):
     nmax = corr.shape[0] - 1
     if nmax % 2 != 0:
         nmax -= 1

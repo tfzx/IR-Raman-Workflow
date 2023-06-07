@@ -6,12 +6,12 @@ from spectra_flow.utils import (
 )
 
 def calculate_corr_vdipole(dipole: np.ndarray, dt_ps: float, window: int):
-    v_dipole = (dipole[2:] - dipole[:-2]) / (2 * dt_ps)
+    v_dipole = (dipole[2:] - dipole[:-2]) / (2 * dt_ps) # type: ignore
     v_dipole -= np.mean(v_dipole, axis = 0, keepdims = True)
     corr = np.sum(calculate_corr(v_dipole, v_dipole, window), axis = -1)
     return corr
 
-def calculate_ir(corr: np.ndarray, width: int, dt_ps: float, temperature: float):
+def calculate_ir(corr: np.ndarray, width: float, dt_ps: float, temperature: float):
     nmax = corr.shape[0] - 1
     if nmax % 2 != 0:
         nmax -= 1

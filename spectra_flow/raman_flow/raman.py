@@ -1,5 +1,5 @@
 from dflow.step import Step
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Type, Union
 from pathlib import Path
 from dflow import (
     OPTemplate,
@@ -35,7 +35,7 @@ from spectra_flow.utils import (
     get_executor
 )
 from spectra_flow.read_par import read_par
-from spectra_flow.base_workflow import AdaptiveFlow, SuperOP, StepKeyPair, StepKey
+from spectra_flow.base_workflow import AdaptiveFlow, StepType, SuperOP, StepKeyPair, StepKey
 
 def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False):
     inputs = read_par(parameters)
@@ -85,7 +85,7 @@ def build_raman(
         name: str,
         parameters: dict, 
         machine: dict, 
-        run_config: dict = None, 
+        run_config: Optional[dict] = None, 
         upload_python_packages = None, 
         with_parallel = True,
         debug = False
@@ -178,10 +178,10 @@ class RamanFlow(AdaptiveFlow):
             name: str,
             run_config: dict,
             executors: Dict[str, Executor],
-            upload_python_packages: List[Union[str, Path]] = None,
-            run_list: Iterable[str] = None,
+            upload_python_packages: Optional[List[Union[str, Path]]] = None,
+            run_list: Optional[Iterable[str]] = None,
             given_inputs: Optional[Iterable[str]] = None, 
-            pri_source: str = None, 
+            pri_source: Optional[str] = None, 
             with_parallel: bool = True,
             debug: bool = False
         ):
@@ -209,7 +209,7 @@ class RamanFlow(AdaptiveFlow):
         )
     
     def build_templates(self, run_list: List[str]) -> Dict[str, OPTemplate]:
-        build_dict = {
+        build_dict: Dict[StepType, Callable[[], OPTemplate]] = {
             PolarSteps: self.build_polar_temp,
             DPolarTrain: self.build_train_temp,
             DpLmpSample: self.build_md_temp,
@@ -219,9 +219,9 @@ class RamanFlow(AdaptiveFlow):
         return {step_name: build_dict[self.all_steps[step_name]]() for step_name in run_list}
 
     @classmethod
-    def to_run_list(self, run_config: dict):
-        name_dict = {self.main_steps[i]: i for i in range(4)}
-        run_list = [self.main_steps[i] for i in range(name_dict[run_config["start_step"]], name_dict[run_config["end_step"]] + 1)]
+    def to_run_list(cls, run_config: dict):
+        name_dict = {cls.main_steps[i]: i for i in range(4)}
+        run_list = [cls.main_steps[i] for i in range(name_dict[run_config["start_step"]], name_dict[run_config["end_step"]] + 1)]
         if run_config.get("run_md", True) and "predict_polar" in run_list:
             run_list += ["md"]
         return run_list
@@ -240,9 +240,9 @@ class RamanFlow(AdaptiveFlow):
         
         mlwf_template = MLWFSteps(
             "mlwf",
-            prepare_op,
-            run_op,
-            collect_op,
+            prepare_op, # type: ignore
+            run_op, # type: ignore
+            collect_op, # type: ignore
             self.executors["base"],
             self.executors["run"],
             self.executors["cal"],
@@ -258,16 +258,16 @@ class RamanFlow(AdaptiveFlow):
 
     def build_train_temp(self):
         return PythonOPTemplate(
-            DPolarTrain, 
+            DPolarTrain,  # type: ignore
             image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-            python_packages = self.upload_python_packages
+            python_packages = self.upload_python_packages # type: ignore
         )
     
     def build_md_temp(self):
         return PythonOPTemplate(
-            DpLmpSample, 
+            DpLmpSample,  # type: ignore
             image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-            python_packages = self.upload_python_packages
+            python_packages = self.upload_python_packages # type: ignore
         )
     
     def build_predict_temp(self):
@@ -281,9 +281,9 @@ class RamanFlow(AdaptiveFlow):
     
     def build_raman_temp(self):
         return PythonOPTemplate(
-            CalRaman, 
+            CalRaman,  # type: ignore
             image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-            python_packages = self.upload_python_packages
+            python_packages = self.upload_python_packages # type: ignore
         )
     
 if __name__ == "__main__":

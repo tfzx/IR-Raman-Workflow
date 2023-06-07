@@ -50,15 +50,15 @@ class MLWFSteps(SuperOP):
             prepare_op: OP,
             run_op: OP,
             collect_op: OP, 
-            prepare_executor: Executor,
-            run_executor: Executor,
-            collect_executor: Executor = None,
+            prepare_executor: Optional[Executor],
+            run_executor: Optional[Executor],
+            collect_executor: Optional[Executor] = None,
             upload_python_packages: Optional[List[Union[str, Path]]] = None,
             parallelism: Optional[int] = None,
             continue_on_error: bool = False,
             continue_on_failed: bool = True,
-            continue_on_num_success: int = None,
-            continue_on_success_ratio: float = None,
+            continue_on_num_success: Optional[int] = None,
+            continue_on_success_ratio: Optional[float] = None,
         ) -> None:
         super().__init__(
             name, 
@@ -91,15 +91,15 @@ class MLWFSteps(SuperOP):
             prepare_op: OP, 
             run_op: OP, 
             collect_op: OP, 
-            prepare_executor: Executor, 
-            run_executor: Executor, 
-            collect_executor: Executor,
+            prepare_executor: Optional[Executor], 
+            run_executor: Optional[Executor], 
+            collect_executor: Optional[Executor],
             upload_python_packages: List[Union[str, Path]],
             parallelism: Optional[int] = None,
             continue_on_error: bool = False,
             continue_on_failed: bool = True,
-            continue_on_num_success: int = None,
-            continue_on_success_ratio: float = None,
+            continue_on_num_success: Optional[int] = None,
+            continue_on_success_ratio: Optional[float] = None,
         ):
         mlwf_setting = self.inputs.parameters["mlwf_setting"]
         task_setting = self.inputs.parameters["task_setting"]
@@ -111,7 +111,7 @@ class MLWFSteps(SuperOP):
             PythonOPTemplate(
                 prepare_op, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-                python_packages = upload_python_packages
+                python_packages = upload_python_packages # type: ignore
             ),
             artifacts={
                 "confs": confs_artifact,
@@ -138,7 +138,7 @@ class MLWFSteps(SuperOP):
                     output_artifact = ["backward"],
                     sub_path = True
                 ),
-                python_packages = upload_python_packages
+                python_packages = upload_python_packages # type: ignore
             ),
             parameters = {
                 "mlwf_setting": prepare.outputs.parameters["mlwf_setting"],
@@ -162,7 +162,7 @@ class MLWFSteps(SuperOP):
             PythonOPTemplate(
                 collect_op, 
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-                python_packages = upload_python_packages,
+                python_packages = upload_python_packages, # type: ignore
             ),
             artifacts={
                 "confs": confs_artifact,

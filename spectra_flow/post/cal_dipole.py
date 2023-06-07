@@ -1,9 +1,10 @@
+from typing import Optional
 import numpy as np, dpdata
 from spectra_flow.utils import k_nearest, box_shift, do_pbc
 
-def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, r_bond: float, mask_sel: np.ndarray = None):
+def _fix_coords(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, r_bond: float, mask_sel: Optional[np.ndarray] = None):
     coords_sel = coords_sel[..., np.newaxis, :]
-    delta = box_shift(coords_oth[..., np.newaxis, :, :] - coords_sel, cells[..., np.newaxis, np.newaxis, :, :])
+    delta = box_shift(coords_oth[..., np.newaxis, :, :] - coords_sel, cells[..., np.newaxis, np.newaxis, :, :]) # type: ignore
     mask = np.linalg.norm(delta, 2, axis = -1, keepdims = True) < r_bond
     if mask_sel is not None:
         mask &= mask_sel[..., np.newaxis, np.newaxis]
@@ -54,7 +55,7 @@ def cal_wc_h2o(wfc: np.ndarray, coords_O: np.ndarray, cells: np.ndarray) -> np.n
     """
     idx = k_nearest(coords_O, wfc, cells, k = 4)
     wfc = np.take_along_axis(wfc[..., np.newaxis, :, :], idx[..., np.newaxis], axis = -2)
-    return np.mean(box_shift(wfc - coords_O[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :]), axis = -2)
+    return np.mean(box_shift(wfc - coords_O[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :]), axis = -2) # type: ignore
 
 def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: np.ndarray, wannier: np.ndarray, r_bond = 1.2) -> np.ndarray:
     coords_oth = fix_coords(coords_sel, coords_oth, cells, r_bond)
@@ -65,15 +66,15 @@ def calculate_dipole_h2o(coords_sel: np.ndarray, coords_oth: np.ndarray, cells: 
 def cal_wc(confs: dpdata.System, wfc: np.ndarray) -> np.ndarray:
     return cal_wc_h2o(
         wfc.reshape(confs.get_nframes(), -1, 3), 
-        confs["coords"][:, confs["atom_types"] == 0], 
-        confs["cells"]
+        confs["coords"][:, confs["atom_types"] == 0],  # type: ignore
+        confs["cells"] # type: ignore
     ).reshape(confs.get_nframes(), -1)
 
 def cal_dipole(confs: dpdata.System, wc: np.ndarray) -> np.ndarray:
     mask_O = confs["atom_types"] == 0
-    coords = do_pbc(confs["coords"], confs["cells"][..., np.newaxis, :, :])
+    coords = do_pbc(confs["coords"], confs["cells"][..., np.newaxis, :, :]) # type: ignore
     nframes = confs.get_nframes()
     wc = wc.reshape(nframes, -1, 3)
     return calculate_dipole_h2o(
-        coords[:, mask_O], coords[:, ~mask_O], confs["cells"], wc, r_bond = 1.2
+        coords[:, mask_O], coords[:, ~mask_O], confs["cells"], wc, r_bond = 1.2 # type: ignore
     ).reshape(nframes, -1)

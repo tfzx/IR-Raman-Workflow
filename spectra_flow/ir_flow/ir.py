@@ -1,5 +1,5 @@
 from dflow.step import Step
-from typing import Dict, Iterable, List, Optional, Tuple, Union
+from typing import Callable, Dict, Iterable, List, Optional, Tuple, Union
 from pathlib import Path
 from dflow import (
     OPTemplate,
@@ -35,7 +35,7 @@ from spectra_flow.utils import (
     get_executor
 )
 from spectra_flow.read_par import read_par
-from spectra_flow.base_workflow import AdaptiveFlow, SuperOP, StepKeyPair, StepKey
+from spectra_flow.base_workflow import AdaptiveFlow, StepType, SuperOP, StepKeyPair, StepKey
 
 def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False):
     inputs = read_par(parameters)
@@ -85,8 +85,8 @@ def build_ir(
         name: str,
         parameters: dict, 
         machine: dict, 
-        run_config: dict = None, 
-        upload_python_packages = None, 
+        run_config: Optional[dict] = None, 
+        upload_python_packages: Optional[List[Union[str, Path]]] = None, 
         with_parallel = True,
         debug = False
     ):
@@ -176,11 +176,11 @@ class IRflow(AdaptiveFlow):
     def __init__(self, 
             name: str,
             run_config: dict,
-            executors: Dict[str, Executor],
-            upload_python_packages: List[Union[str, Path]] = None,
-            run_list: Iterable[str] = None,
+            executors: Dict[str, Optional[Executor]],
+            upload_python_packages: Optional[List[Union[str, Path]]] = None,
+            run_list: Optional[Iterable[str]] = None,
             given_inputs: Optional[Iterable[str]] = None, 
-            pri_source: str = None, 
+            pri_source: Optional[str] = None, 
             with_parallel: bool = True,
             debug: bool = False
         ):
@@ -208,7 +208,7 @@ class IRflow(AdaptiveFlow):
         )
     
     def build_templates(self, run_list: List[str]) -> Dict[str, OPTemplate]:
-        build_dict = {
+        build_dict: Dict[StepType, Callable[[], OPTemplate]] = {
             DipoleSteps: self.build_dipole_temp,
             DWannTrain: self.build_train_temp,
             DpLmpSample: self.build_md_temp,
@@ -239,9 +239,9 @@ class IRflow(AdaptiveFlow):
         
         mlwf_template = MLWFSteps(
             "mlwf",
-            prepare_op,
-            run_op,
-            collect_op,
+            prepare_op, # type: ignore
+            run_op, # type: ignore
+            collect_op, # type: ignore
             self.executors["base"],
             self.executors["run"],
             self.executors["cal"],
@@ -256,16 +256,16 @@ class IRflow(AdaptiveFlow):
 
     def build_train_temp(self):
         return PythonOPTemplate(
-            DWannTrain, 
+            DWannTrain,  # type: ignore
             image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-            python_packages = self.upload_python_packages
+            python_packages = self.upload_python_packages # type: ignore
         )
     
     def build_md_temp(self):
         return PythonOPTemplate(
-            DpLmpSample, 
+            DpLmpSample,  # type: ignore
             image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-            python_packages = self.upload_python_packages
+            python_packages = self.upload_python_packages # type: ignore
         )
     
     def build_predict_temp(self):
@@ -279,9 +279,9 @@ class IRflow(AdaptiveFlow):
     
     def build_ir_temp(self):
         return PythonOPTemplate(
-            CalIR, 
+            CalIR,  # type: ignore
             image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-            python_packages = self.upload_python_packages
+            python_packages = self.upload_python_packages # type: ignore
         )
     
 if __name__ == "__main__":
@@ -321,23 +321,4 @@ if __name__ == "__main__":
             "deepmd_lammps": ex,
         },
         debug = True
-    )
-    ir_step = Step(
-        "test",
-        ir_template,
-        parameters = {
-            "train_conf_fmt": {},
-            "dwann_setting": {},
-            "global_config": {},
-            "mlwf_setting": {},
-            "task_setting": {},
-            "init_conf_fmt": {}
-        },
-        artifacts = {
-            "train_confs": "",
-            "pseudo": "",
-            "cal_dipole_python": "",
-            "init_conf": "",
-            "dp_model": "",
-        }
     )

@@ -18,13 +18,13 @@ if __name__ == "__main__":
     }
     ir_step = build_ir("ir-example2", load_json("parameters.json"), load_json("../machine.json"), run_config)
 
-    wf = Workflow("ir-workflow")
+    wf = Workflow("ir-workflow") # type: ignore
     wf.add(ir_step)
     wf.submit()
     while wf.query_status() in ["Pending", "Running"]:
         time.sleep(1)
     assert(wf.query_status() == "Succeeded")
-    ir_path = download_artifact(wf.query_step("ir-example2")[0].outputs.artifacts["ir"], path = "back")[0]
+    ir_path = download_artifact(wf.query_step("ir-example2")[0].outputs.artifacts["ir"], path = "back")[0] # type: ignore
     ir = np.loadtxt(ir_path)
     plt.plot(ir[:, 0], ir[:, 1] / 1000, label = r'$D_2O$, calculated', scalex = 1.5, scaley= 2.2)
     plt.xlim((0, 4000.))

@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 from pathlib import Path
 from dflow import (
     Step,
@@ -59,11 +59,11 @@ class PolarSteps(SuperOP):
             mlwf_template: MLWFSteps,
             base_exexutor: Executor,
             cal_executor: Executor,
-            upload_python_packages: List[Union[str, Path]] = None
+            upload_python_packages: Optional[List[Union[str, Path]]] = None
         ):
         super().__init__(name)
         if not upload_python_packages:
-            upload_python_packages = spectra_flow.__path__
+            upload_python_packages = list(spectra_flow.__path__)
         self.build_steps(
             mlwf_template, 
             base_exexutor,
@@ -88,8 +88,8 @@ class PolarSteps(SuperOP):
         prep_polar = Step(
             name = "prep-polar",
             template = PythonOPTemplate(
-                PrepPolar, 
-                python_packages = upload_python_packages
+                PrepPolar,  # type: ignore
+                python_packages = upload_python_packages # type: ignore
             ),
             parameters = {
                 "polar_setting": polar_setting,
@@ -126,8 +126,8 @@ class PolarSteps(SuperOP):
         post_polar = Step(
             name = "post-polar",
             template = PythonOPTemplate(
-                PostPolar,
-                python_packages = upload_python_packages
+                PostPolar, # type: ignore
+                python_packages = upload_python_packages # type: ignore
             ),
             parameters = {
                 "polar_setting": polar_setting,

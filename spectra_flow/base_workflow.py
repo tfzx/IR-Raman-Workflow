@@ -27,9 +27,9 @@ import abc, numpy as np
 class SuperOP(Steps, abc.ABC):
     def __init__(self,
             name: Optional[str] = None,
-            steps: List[Union[Step, List[Step]]] = None,
+            steps: Optional[List[Union[Step, List[Step]]]] = None,
             memoize_key: Optional[str] = None,
-            annotations: Dict[str, str] = None,
+            annotations: Optional[Dict[str, str]] = None,
             parallelism: Optional[int] = None,
             ) -> None:
         self._input_parameters, self._input_artifacts = self.get_inputs()
@@ -44,9 +44,9 @@ class SuperOP(Steps, abc.ABC):
                 parameters= self._output_parameters,
                 artifacts = self._output_artifacts
             ),
-            steps = steps,
+            steps = steps, # type: ignore
             memoize_key = memoize_key,
-            annotations = annotations,
+            annotations = annotations, # type: ignore
             parallelism = parallelism
         )
     
@@ -173,16 +173,16 @@ class IODictHandler:
 
 
 class AdaptiveFlow(Steps, abc.ABC):
-    all_steps: Dict[str, StepType] = []
+    all_steps: Dict[str, StepType] = {}
     steps_list: List[str] = []
     parallel_steps: List[List[str]] = []
-    python_op_executor: Dict[str, Executor] = {}
+    python_op_executor: Dict[str, Optional[Executor]] = {}
     def __init__(
             self, 
             name: str, 
             run_list: Iterable[str], 
             given_inputs: Optional[Iterable[str]] = None, 
-            pri_source: str = None, 
+            pri_source: Optional[str] = None, 
             with_parallel: bool = True, 
             debug: bool = False
         ) -> None:
@@ -262,7 +262,7 @@ class AdaptiveFlow(Steps, abc.ABC):
             parents[end_step_name] = [steps_list[i] for i in np.nonzero(mask)[0]]
         return parents
 
-    def cal_total_io(self, run_list: Iterable[str], given_inputs: Optional[Iterable[str]] = None, pri_source: str = None):
+    def cal_total_io(self, run_list: Iterable[str], given_inputs: Optional[Iterable[str]] = None, pri_source: Optional[str] = None):
         io_dict = self.get_io_dict()
 
         total_io: Dict[str, Dict[str, StepKeyPair]] = {steps: {} for steps in run_list}
@@ -283,13 +283,12 @@ class AdaptiveFlow(Steps, abc.ABC):
                     )
         return total_io
     
-    def prebuild(self, run_list: List[str] = steps_list, total_io: Dict[str, Dict[str, StepKeyPair]] = None):
+    def prebuild(self, run_list: List[str] = steps_list, total_io: Optional[Dict[str, Dict[str, StepKeyPair]]] = None):
         if total_io is not None:
             run_list = list(total_io.keys())
         else:
             total_io = self.cal_total_io(run_list)
         all_steps = self.all_steps
-        inputs_type = self.inputs_type
         inputs_dict = self.inputs_dict
 
         steps_inputs_parameters: Dict[str, Dict[str, StepKeyPair]] = {step_name: {} for step_name in run_list}
@@ -300,14 +299,15 @@ class AdaptiveFlow(Steps, abc.ABC):
         for step_name in run_list:
             steps = all_steps[step_name]
             for in_key, (pre_steps_name, out_key) in total_io[step_name].items():
-                if in_key in inputs_type[steps]["parameters"]:
+                this_inputs = inputs_dict[steps][in_key]
+                if isinstance(this_inputs, InputParameter):
                     steps_inputs_parameters[step_name][in_key] = (pre_steps_name, out_key)
                     if pre_steps_name is None:
-                        input_parameters[out_key] = inputs_dict[steps][in_key]
-                elif in_key in inputs_type[steps]["artifacts"]:
+                        input_parameters[out_key] = this_inputs
+                elif isinstance(this_inputs, InputArtifact):
                     steps_inputs_artifacts[step_name][in_key] = (pre_steps_name, out_key)
                     if pre_steps_name is None:
-                        input_artifacts[out_key] = inputs_dict[steps][in_key]
+                        input_artifacts[out_key] = this_inputs
                 else:
                     raise AssertionError(f"Step {step_name}({steps.__name__}) has no inputs named '{in_key}'!")
 
@@ -378,7 +378,7 @@ class AdaptiveFlow(Steps, abc.ABC):
         for step_name in run_list:
             step_type = self.all_steps[step_name]
             if issubclass(step_type, OP):
-                templates[step_name] = PythonOPTemplate(step_type)
+                templates[step_name] = PythonOPTemplate(step_type) # type: ignore
             else:
                 templates[step_name] = step_type()
         return templates
@@ -396,7 +396,7 @@ class AdaptiveFlow(Steps, abc.ABC):
                 i += 1
         return step_ll
 
-    def default_parallel(self, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: List[str] = None):
+    def default_parallel(self, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: Optional[List[str]] = None):
         if run_list is None:
             run_list = list(total_io.keys())
         num_steps = len(run_list)
@@ -459,8 +459,9 @@ class AdaptiveFlow(Steps, abc.ABC):
         inputs_dict: Dict[StepType, Dict[str, Union[InputParameter, InputArtifact]]] = {}
         for steps in set(cls.all_steps.values()):
             p, a = get_inputs(steps)
-            p.update(a)
-            inputs_dict[steps] = p
+            inputs_dict[steps] = {}
+            inputs_dict[steps].update(p)
+            inputs_dict[steps].update(a)
         return inputs_dict
 
     @property
@@ -474,8 +475,9 @@ class AdaptiveFlow(Steps, abc.ABC):
         outputs_dict: Dict[StepType, Dict[str, Union[OutputParameter, OutputArtifact]]] = {}
         for steps in set(cls.all_steps.values()):
             p, a = get_outputs(steps)
-            p.update(a)
-            outputs_dict[steps] = p
+            outputs_dict[steps] = {}
+            outputs_dict[steps].update(p)
+            outputs_dict[steps].update(a)
         return outputs_dict
 
     @property
@@ -515,7 +517,7 @@ class AdaptiveFlow(Steps, abc.ABC):
 
     @classmethod
     def check_steps_list(cls):
-        pre_set = set([None])
+        pre_set: Set[Union[str, None]] = set([None])
         inputs_dict = cls.get_substeps_inputs()
         io_dict = cls.get_io_dict()
         for step_name in cls.steps_list:
@@ -590,7 +592,7 @@ class AdaptiveFlow(Steps, abc.ABC):
         return inc_mat
 
     @classmethod
-    def cal_components(cls, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: List[str] = None):
+    def cal_components(cls, total_io: Dict[str, Dict[str, StepKeyPair]], run_list: Optional[List[str]] = None):
         if run_list is None:
             run_list = list(total_io.keys())
         num_steps = len(run_list)
@@ -703,7 +705,7 @@ if __name__ == "__main__":
         steps_list = ["a", "b", "c", "d"]
         
         @classmethod
-        def get_io_dict(cls) -> Dict[StepType, Dict[str, List[Tuple[StepType, str]]]]:
+        def get_io_dict(cls):
             io_dict = super().get_io_dict()
             io_dict["b"]["B.1"] += [("a", "A.5")]
             io_dict["b"]["B.2"] += [("a", "A.6")]
@@ -713,7 +715,7 @@ if __name__ == "__main__":
             # io_dict["d"]["D.2"] += [ ("c", "C.8")]
             return io_dict
         
-        def build_templates(self, run_list: List[StepType]) -> Dict[StepType, OPTemplate]:
+        def build_templates(self, run_list):
             return super().build_templates(run_list)
     
     ABflow.check_steps_list()

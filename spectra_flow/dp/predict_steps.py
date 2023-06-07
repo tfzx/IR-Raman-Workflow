@@ -46,13 +46,13 @@ class PredictSteps(SuperOP):
     def __init__(self, 
             name: str,
             tensor_type: str,
-            predict_executor: Executor,
-            cal_executor: Executor,
-            upload_python_packages: List[Union[str, Path]] = None
+            predict_executor: Optional[Executor],
+            cal_executor: Optional[Executor],
+            upload_python_packages: Optional[List[Union[str, Path]]] = None
         ):
         super().__init__(name)
         if not upload_python_packages:
-            upload_python_packages = spectra_flow.__path__
+            upload_python_packages = list(spectra_flow.__path__)
         tensor_type = tensor_type.lower().strip()
         self.build_steps(
             tensor_type,
@@ -64,8 +64,8 @@ class PredictSteps(SuperOP):
     def build_steps(
             self, 
             tensor_type: str,
-            predict_executor: Executor,
-            cal_executor: Executor,
+            predict_executor: Optional[Executor],
+            cal_executor: Optional[Executor],
             upload_python_packages: List[Union[str, Path]]
         ):
         dp_setting = self.inputs.parameters["dp_setting"]
@@ -88,9 +88,9 @@ class PredictSteps(SuperOP):
         predict_step = Step(
             f"predict-{tensor_type}",
             PythonOPTemplate(
-                predict_op, 
+                predict_op,  # type: ignore
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-                python_packages = upload_python_packages
+                python_packages = upload_python_packages # type: ignore
             ),
             artifacts = {
                 "sampled_system": sampled_system,
@@ -107,9 +107,9 @@ class PredictSteps(SuperOP):
         total_tensor = Step(
             f"total-{tensor_type}",
             PythonOPTemplate(
-                total_tensor_op, 
+                total_tensor_op,  # type: ignore
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-                python_packages = upload_python_packages
+                python_packages = upload_python_packages # type: ignore
             ),
             artifacts={
                 "confs": sampled_system,

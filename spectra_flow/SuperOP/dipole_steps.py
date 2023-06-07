@@ -1,4 +1,4 @@
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 from pathlib import Path
 from dflow import (
     OutputParameter,
@@ -54,12 +54,12 @@ class DipoleSteps(SuperOP):
             self,
             name: str,
             mlwf_template: MLWFSteps,
-            cal_executor: Executor,
-            upload_python_packages: List[Union[str, Path]] = None
+            cal_executor: Optional[Executor],
+            upload_python_packages: Optional[List[Union[str, Path]]] = None
         ):
         super().__init__(name)
         if not upload_python_packages:
-            upload_python_packages = spectra_flow.__path__
+            upload_python_packages = list(spectra_flow.__path__)
         self.build_steps(
             mlwf_template, 
             cal_executor, 
@@ -69,7 +69,7 @@ class DipoleSteps(SuperOP):
     def build_steps(
             self, 
             mlwf_template: MLWFSteps,
-            cal_executor: Executor,
+            cal_executor: Optional[Executor],
             upload_python_packages: List[Union[str, Path]]
         ):
         mlwf_setting = self.inputs.parameters["mlwf_setting"]
@@ -101,9 +101,9 @@ class DipoleSteps(SuperOP):
         wc_step = Step(
             "cal-wc",
             PythonOPTemplate(
-                CalWC, 
+                CalWC,  # type: ignore
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-                python_packages = upload_python_packages
+                python_packages = upload_python_packages # type: ignore
             ),
             parameters = {
                 "conf_fmt": final_conf_fmt

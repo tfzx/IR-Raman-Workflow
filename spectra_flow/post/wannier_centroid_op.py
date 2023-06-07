@@ -33,7 +33,7 @@ class CalWC(OP):
             "wannier_centroid": Artifact(Dict[str, Path])
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -61,6 +61,6 @@ class CalWC(OP):
     def cal_wc(self, confs: dpdata.System, wfc: np.ndarray) -> np.ndarray:
         return cal_wc_h2o(
             wfc.reshape(confs.get_nframes(), -1, 3), 
-            confs["coords"][:, confs["atom_types"] == 0], 
-            confs["cells"]
+            confs["coords"][:, confs["atom_types"] == 0],  # type: ignore
+            confs["cells"] # type: ignore
         ).reshape(confs.get_nframes(), -1)

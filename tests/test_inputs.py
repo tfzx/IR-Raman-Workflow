@@ -138,7 +138,7 @@ class TestInputs(unittest.TestCase):
             }
         )
         self.assertDictEqual(
-            kpoints,
+            kpoints, # type: ignore
             {
                 "type": "automatic",
                 "k_grid": (1, 1, 1)
@@ -186,10 +186,10 @@ class TestInputs(unittest.TestCase):
                 "cell": None
             }
         )
-        self.assertTrue((np.abs(kpoints["k_points"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all())
-        kpoints["k_points"] = True
+        self.assertTrue((np.abs(kpoints["k_points"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all()) # type: ignore
+        kpoints["k_points"] = True # type: ignore
         self.assertDictEqual(
-            kpoints,
+            kpoints, # type: ignore
             {
                 "type": "crystal",
                 "k_points": True
@@ -237,10 +237,10 @@ class TestInputs(unittest.TestCase):
                 "cell": None
             }
         )
-        self.assertTrue((np.abs(kpoints["k_points"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all())
-        kpoints["k_points"] = True
+        self.assertTrue((np.abs(kpoints["k_points"] - np.array([0.0, 0.0, 0.0, 1.0])) < 1e-5).all()) # type: ignore
+        kpoints["k_points"] = True # type: ignore
         self.assertDictEqual(
-            kpoints,
+            kpoints, # type: ignore
             {
                 "type": "crystal",
                 "k_points": True
@@ -337,7 +337,7 @@ class TestInputs(unittest.TestCase):
             }
         )
         self.assertDictEqual(
-            kpoints,
+            kpoints, # type: ignore
             {
                 "type": "automatic",
                 "k_grid": (1, 1, 1)

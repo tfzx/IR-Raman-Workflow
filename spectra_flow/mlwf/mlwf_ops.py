@@ -1,6 +1,6 @@
 from math import ceil
 from types import ModuleType
-from typing import Dict, List, Tuple, Union
+from typing import Dict, List, Optional, Tuple, Union
 from pathlib import Path
 import abc, shutil, numpy as np
 from dflow.python import (
@@ -37,11 +37,11 @@ class Prepare(OP, abc.ABC):
     def get_output_sign(cls):
         return OPIOSign({
             "mlwf_setting": BigParameter(dict),
-            "task_path": Artifact(List[Path], archive=None),
+            "task_path": Artifact(List[Path], archive=None), # type: ignore
             "frames_list": BigParameter(List[Tuple[int]])
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -76,12 +76,12 @@ class Prepare(OP, abc.ABC):
             start_f = i * group_size
             end_f = min(start_f + group_size, nframes)
             frames_list.append((start_f, end_f))
-            with set_directory(task_name, mkdir = True):
+            with set_directory(task_name, mkdir = True): # type: ignore
                 shutil.copytree(pseudo, "./pseudo")
                 for frame in range(start_f, end_f):
                     subtask_name = f"conf.{frame:06d}"
                     print(subtask_name)
-                    with set_directory(subtask_name, mkdir = True):
+                    with set_directory(subtask_name, mkdir = True): # type: ignore
                         self.prep_one_frame(frame)
         return task_path, frames_list
 
@@ -89,7 +89,7 @@ class Prepare(OP, abc.ABC):
     def init_inputs(self, 
                     mlwf_setting: Dict[str, Union[str, dict]], 
                     confs: dpdata.System,
-                    wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
+                    wc_python: Optional[ModuleType] = None) -> Dict[str, Union[str, dict]]:
         pass
 
     @abc.abstractmethod
@@ -116,7 +116,7 @@ class RunMLWF(OP, abc.ABC):
             "backward": Artifact(List[Path])
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -206,7 +206,7 @@ class CollectWFC(OP, abc.ABC):
             "failed_confs": Artifact(Path),
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -236,7 +236,7 @@ class CollectWFC(OP, abc.ABC):
     
     def collect_wfc(self, mlwf_setting: dict, conf_sys: dpdata.System, backward: List[Path]):
         assert conf_sys.get_nframes() == len(backward)
-        self.init_params(mlwf_setting, conf_sys, backward)
+        self.init_params(mlwf_setting, conf_sys, backward[0])
         total_wfc: Dict[str, np.ndarray] = {}
         failed_frames: List[int] = []
         success_frames: List[int] = []

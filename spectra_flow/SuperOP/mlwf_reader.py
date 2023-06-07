@@ -80,12 +80,12 @@ class MLWFReaderQeW90:
     def qe_iter(self):
         qe_keys = ["ori"]
         if self.with_efield:
-            qe_keys += [f"ef_{name}" for name in self.efields]
+            qe_keys += [f"ef_{name}" for name in self.efields] # type: ignore
         return qe_keys
 
     @property
     def dft_params(self) -> dict:
-        return self.mlwf_setting["dft_params"]
+        return self.mlwf_setting["dft_params"] # type: ignore
 
     @property
     def scf_params(self) -> Dict[str, Dict[str, Union[str, float, bool]]]:
@@ -103,28 +103,28 @@ class MLWFReaderQeW90:
         return self.dft_params["pw2wan_params"]
 
     @property
-    def w90_params(self) -> Dict[str, dict]:
-        return self.mlwf_setting.get("wannier90_params", None)
+    def w90_params(self) -> Optional[Dict[str, dict]]:
+        return self.mlwf_setting.get("wannier90_params", None) # type: ignore
 
     @property
-    def multi_w90_params(self) -> Dict[str, Dict[str, dict]]:
-        return self.mlwf_setting.get("multi_w90_params", None)
+    def multi_w90_params(self) -> Optional[Dict[str, Dict[str, dict]]]:
+        return self.mlwf_setting.get("multi_w90_params", None) # type: ignore
 
     @property
     def atomic_species(self) -> Dict[str, Dict[str, Union[str, float]]]:
         return self.dft_params.get("atomic_species", None)
 
     @property
-    def with_efield(self):
-        return self.mlwf_setting.get("with_efield", False) and self.efields
+    def with_efield(self) -> bool:
+        return self.mlwf_setting.get("with_efield", False) and (self.efields is not None) # type: ignore
     
     @property
-    def efields(self) -> Dict[str, List[Union[int, float]]]:
-        return self.mlwf_setting.get("efields", None)
+    def efields(self) -> Optional[Dict[str, List[Union[int, float]]]]:
+        return self.mlwf_setting.get("efields", None) # type: ignore
 
     @property
     def ef_type(self) -> str:
-        return self.mlwf_setting.get("ef_type", "enthalpy")
+        return self.mlwf_setting.get("ef_type", "enthalpy") # type: ignore
 
     def seed_name(self, qe_key: str, w90_key: str):
         return f"{self.name}_{qe_key}_{w90_key}"
@@ -138,29 +138,37 @@ class MLWFReaderQeW90:
     def get_w90_params_dict(self):
         multi_w90_params = self.multi_w90_params
         if multi_w90_params is None:
-            multi_w90_params = {"": self.w90_params}
-        return multi_w90_params
+            assert self.w90_params is not None
+            w90_params_dict = {"": self.w90_params}
+        else:
+            w90_params_dict = multi_w90_params
+        return w90_params_dict
     
-    def get_kgrid(self) -> Tuple[Optional[List[int]], Optional[List[int]]]:
-        scf_grid = None; nscf_grid = None
+    def get_kgrid(self) -> Tuple[Tuple[int, int, int], Optional[Tuple[int, int, int]]]:
+        _scf_grid = None; _nscf_grid = None
         dft_params = self.dft_params
-        scf_grid = dft_params.get("k_grid", None)
+        _scf_grid = dft_params.get("k_grid", None)
         if "kmesh" in self.mlwf_setting:
             if "scf_grid" in self.mlwf_setting["kmesh"]:
-                scf_grid = self.mlwf_setting["kmesh"]["scf_grid"]
+                _scf_grid = self.mlwf_setting["kmesh"]["scf_grid"] # type: ignore
             if "nscf_grid" in self.mlwf_setting["kmesh"]:
-                nscf_grid = self.mlwf_setting["kmesh"]["nscf_grid"]
-        if nscf_grid is None:
+                _nscf_grid = self.mlwf_setting["kmesh"]["nscf_grid"] # type: ignore
+        scf_grid: Optional[Tuple[int, int, int]] = None
+        nscf_grid: Optional[Tuple[int, int, int]] = None
+        if _scf_grid is not None:
+            scf_grid = tuple(_scf_grid) # type: ignore
+        if _nscf_grid is None:
             nscf_grid = scf_grid
+        assert scf_grid is not None
         return scf_grid, nscf_grid
 
     def get_qe_params_dict(self):
         scf_params = self.scf_params
-        qe_params_dict = {}
+        qe_params_dict: Dict[str, dict] = {}
         if self.with_efield:
             ef_type = self.ef_type
             qe_params_dict["ori"] = self.complete_ef(scf_params, efield = None, ef_type = ef_type, is_ori = True)
-            for ef_name, efield in self.efields.items():
+            for ef_name, efield in self.efields.items(): # type: ignore
                 qe_params_dict[f"ef_{ef_name}"] = self.complete_ef(scf_params, efield, ef_type, is_ori = False)
         else:
             qe_params_dict["ori"] = scf_params

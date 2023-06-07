@@ -42,11 +42,11 @@ class MDSteps(SuperOP):
     def __init__(self, 
             name: str,
             md_executor: Executor,
-            upload_python_packages: List[Union[str, Path]] = None
+            upload_python_packages: Optional[List[Union[str, Path]]] = None
         ):
         super().__init__(name)
         if not upload_python_packages:
-            upload_python_packages = spectra_flow.__path__
+            upload_python_packages = list(spectra_flow.__path__)
         self.build_steps(
             md_executor, 
             upload_python_packages
@@ -65,9 +65,9 @@ class MDSteps(SuperOP):
         deepmd_lammps = Step(
             "lammps",
             PythonOPTemplate(
-                DpLmpSample, 
+                DpLmpSample,  # type: ignore
                 image="registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
-                python_packages = upload_python_packages
+                python_packages = upload_python_packages # type: ignore
             ),
             artifacts = {
                 "init_conf": init_conf,

@@ -27,7 +27,7 @@ class CalTotalPolar(OP):
             "total_polar": Artifact(Path)
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,

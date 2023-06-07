@@ -10,7 +10,7 @@ class MockedPrepare(Prepare):
     def init_inputs(self, 
                     mlwf_setting: Dict[str, Union[str, dict]], 
                     confs: dpdata.System,
-                    wc_python: ModuleType = None) -> Dict[str, Union[str, dict]]:
+                    wc_python: Optional[ModuleType] = None) -> Dict[str, Union[str, dict]]:
         self.task_path = []
         self.conf_path = []
         return super().init_inputs(mlwf_setting, confs)

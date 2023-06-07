@@ -32,7 +32,7 @@ class PostPolar(OP):
             "polarizability": Artifact(Path)
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -45,8 +45,8 @@ class PostPolar(OP):
         for key, p in op_in["wannier_centroid"].items():
             arr = np.loadtxt(p, dtype = float, ndmin = 2)
             wc_dict[key] = arr.reshape(arr.shape[0], -1, 3)
-        ef_type = polar_setting.get("ef_type", "enthalpy").lower()
-        polar = self.cal_polar(c_diff, eps, ef_type, confs, wc_dict)
+        ef_type = polar_setting.get("ef_type", "enthalpy").lower() # type: ignore
+        polar = self.cal_polar(c_diff, eps, ef_type, confs, wc_dict) # type: ignore
         polar_path = Path("polarizability.raw")
         np.savetxt(polar_path, polar)
         return OPIO({
@@ -110,13 +110,13 @@ class PostPolar(OP):
             delta = eps
         for dir in range(3):
             try:
-                polar[:, :, dir, :] = (wc_dict[keys[dir][0]] - wc_dict[keys[dir][1]]) / delta
+                polar[:, :, dir, :] = (wc_dict[keys[dir][0]] - wc_dict[keys[dir][1]]) / delta # type: ignore
             except KeyError:
                 print(f"[WARNING] An error occured while calculating the polarizability along dir {dir}!")
                 print("[WARNING] Set the polarizability to 0.")
                 pass
         if ef_type == "saw":
-            cells: np.ndarray = confs["cells"]
+            cells: np.ndarray = confs["cells"] # type: ignore
             cells = (cells / np.linalg.norm(cells, ord = 2, axis = -1, keepdims = True))
             inv_c = inv_cells(cells)
             cells = cells.transpose(0, -1, -2) * np.linalg.norm(inv_c, ord = 2, axis = -2, keepdims = True)

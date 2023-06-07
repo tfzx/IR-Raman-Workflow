@@ -17,11 +17,11 @@ if __name__ == "__main__":
         "end_step": "train_wann"
     }
     ir_step = build_ir("ir-example3", load_json("parameters.json"), load_json("../machine.json"), run_config, debug = True)
-    wf = Workflow("ir-workflow")
+    wf = Workflow("ir-workflow") # type: ignore
     wf.add(ir_step)
     wf.submit()
     while wf.query_status() in ["Pending", "Running"]:
         time.sleep(1)
     assert(wf.query_status() == "Succeeded")
-    lcurve = download_artifact(wf.query_step("ir-example3")[0].outputs.artifacts["lcurve"], path = "back")[0]
+    lcurve = download_artifact(wf.query_step("ir-example3")[0].outputs.artifacts["lcurve"], path = "back")[0] # type: ignore
     print(Path(lcurve).read_text())

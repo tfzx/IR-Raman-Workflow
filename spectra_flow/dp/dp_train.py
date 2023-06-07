@@ -39,7 +39,7 @@ class DPTrain(OP, abc.ABC):
             "lcurve": Artifact(Path)
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -67,7 +67,7 @@ class DPTrain(OP, abc.ABC):
         train_dir = Path("train")
         data_dir.mkdir()
         train_dir.mkdir()
-        confs, label = filter_confs(confs, label)
+        confs, label = filter_confs(confs, label) # type: ignore
         confs.to("deepmd/npy", data_dir, set_size = set_size)
         nframes = confs.get_nframes()
         start_i = 0

@@ -30,7 +30,7 @@ class CalTotalDipole(OP):
             "total_dipole": Artifact(Path)
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
@@ -54,9 +54,9 @@ class CalTotalDipole(OP):
     
     def cal_dipole(self, confs: dpdata.System, wc: np.ndarray) -> np.ndarray:
         mask_O = confs["atom_types"] == 0
-        coords = do_pbc(confs["coords"], confs["cells"][..., np.newaxis, :, :])
+        coords = do_pbc(confs["coords"], confs["cells"][..., np.newaxis, :, :]) # type: ignore
         nframes = confs.get_nframes()
         wc = wc.reshape(nframes, -1, 3)
         return calculate_dipole_h2o(
-            coords[:, mask_O], coords[:, ~mask_O], confs["cells"], wc, r_bond = 1.2
+            coords[:, mask_O], coords[:, ~mask_O], confs["cells"], wc, r_bond = 1.2 # type: ignore
         ).reshape(nframes, -1)

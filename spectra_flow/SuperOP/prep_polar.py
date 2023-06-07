@@ -31,19 +31,19 @@ class PrepPolar(OP, abc.ABC):
             "mlwf_setting": BigParameter(dict)
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,
     ) -> OPIO:
         mlwf_setting: Dict[str, Union[str, dict]] = op_in["mlwf_setting"]
         polar_setting: dict = op_in["polar_setting"]
-        mlwf_setting["with_efield"] = True
+        mlwf_setting["with_efield"] = True # type: ignore
         ef_type = polar_setting.get("ef_type", "enthalpy").lower()
         mlwf_setting["ef_type"] = ef_type
         eps = polar_setting["eps_efield"]
         if "ef_params" in polar_setting:
-            recurcive_update(mlwf_setting["dft_params"], polar_setting["ef_params"])
+            recurcive_update(mlwf_setting["dft_params"], polar_setting["ef_params"]) # type: ignore
         if "efields" in polar_setting:
             mlwf_setting["efields"] = polar_setting["efields"]
         else:

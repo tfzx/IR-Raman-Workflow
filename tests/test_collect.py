@@ -36,13 +36,13 @@ class TestCollect(unittest.TestCase):
             "conf_fmt": self.conf_fmt,
             "backward": self.backs
         }
-        op_out = collect_op.execute(op_in)
+        op_out = collect_op.execute(op_in) # type: ignore
         wfc = op_out["wannier_function_centers"]
         final_confs = op_out["final_confs"]
         final_conf_fmt = op_out["final_conf_fmt"]
         final_confs = read_conf(final_confs, final_conf_fmt)
         self.assertEqual(final_confs.get_nframes(), 2)
-        self.assert_(np.allclose(ori_confs["coords"], final_confs["coords"]))
+        self.assert_(np.allclose(ori_confs["coords"], final_confs["coords"])) # type: ignore
         self.assert_(op_out["failed_confs"].exists())
         wfc1 = np.loadtxt(wfc["test1"], dtype = float).reshape(-1, 10, 3)
         wfc2 = np.loadtxt(wfc["test2"], dtype = float).reshape(-1, 9, 3)
@@ -58,20 +58,20 @@ class TestCollect(unittest.TestCase):
             "conf_fmt": self.conf_fmt,
             "backward": self.backs
         }
-        op_out = collect_op.execute(op_in)
+        op_out = collect_op.execute(op_in) # type: ignore
         wfc = op_out["wannier_function_centers"]
 
         final_confs = op_out["final_confs"]
         final_conf_fmt = op_out["final_conf_fmt"]
         final_confs = read_conf(final_confs, final_conf_fmt)
         self.assertEqual(final_confs.get_nframes(), 1)
-        self.assert_(np.allclose(ori_confs[0]["coords"], final_confs["coords"]))
+        self.assert_(np.allclose(ori_confs[0]["coords"], final_confs["coords"])) # type: ignore
 
         failed_confs = op_out["failed_confs"]
         self.assert_(failed_confs.exists())
         failed_confs = read_conf(failed_confs, {"fmt": "deepmd/npy"})
         self.assertEqual(failed_confs.get_nframes(), 1)
-        self.assert_(np.allclose(ori_confs[1]["coords"], failed_confs["coords"]))
+        self.assert_(np.allclose(ori_confs[1]["coords"], failed_confs["coords"])) # type: ignore
 
         wfc1 = np.loadtxt(wfc["test1"], dtype = float).reshape(-1, 10, 3)
         wfc2 = np.loadtxt(wfc["test2"], dtype = float).reshape(-1, 9, 3)

@@ -29,7 +29,7 @@ class DpPredict(OP, abc.ABC):
             "predicted_tensor": Artifact(Path)
         })
 
-    @OP.exec_sign_check
+    @OP.exec_sign_check # type: ignore
     def execute(
             self,
             op_in: OPIO,

@@ -43,7 +43,7 @@ def load_json(path: Union[str, Path]):
         setting = json.load(f)
     return setting
 
-def bohrium_login(account_config: dict = None, debug: bool = False):
+def bohrium_login(account_config: Optional[dict] = None, debug: bool = False):
     from dflow import config, s3_config
     from dflow.plugins import bohrium
     from dflow.plugins.bohrium import TiefblueClient
@@ -63,7 +63,7 @@ def bohrium_login(account_config: dict = None, debug: bool = False):
     s3_config["repo_key"] = "oss-bohrium"
     s3_config["storage_client"] = TiefblueClient()
 
-def conf_from_npz(raw_conf, type_map: List[str] = None):
+def conf_from_npz(raw_conf, type_map: Optional[List[str]] = None):
     conf_data = dict(raw_conf)
     types = conf_data["atom_types"]
     ntyp = np.max(types) + 1
@@ -73,8 +73,8 @@ def conf_from_npz(raw_conf, type_map: List[str] = None):
     return dpdata.System(data = conf_data)
 
 def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
-    fmt: str = conf_fmt.get("fmt", "")
-    type_map = conf_fmt.get("type_map", None)
+    fmt: str = conf_fmt.get("fmt", "") # type: ignore
+    type_map: List[str] = conf_fmt.get("type_map", None) # type: ignore
     fmt = fmt.strip()
     if fmt:
         head = fmt.split("/")[0]
@@ -95,8 +95,8 @@ def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dp
                     conf = conf_from_npz(np.load(conf_path), type_map)
     return conf
 
-def write_to_diagonal(a: np.ndarray, diag: np.ndarray, offset: int = 0, axis1: int = 0, axis2: int = 1):
-    diag_slices = [slice(None) for _ in a.shape]
+def write_to_diagonal(a: np.ndarray, diag: Union[np.ndarray, float, int], offset: int = 0, axis1: int = 0, axis2: int = 1):
+    diag_slices: List[Union[slice, list]] = [slice(None) for _ in a.shape]
     start_idx = [max(-offset, 0), max(offset, 0)]
     diag_len = min(a.shape[axis1] - start_idx[0], a.shape[axis2] - start_idx[1])
     assert diag_len >= 0
@@ -129,7 +129,7 @@ def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.nd
         self_comp = True
     distance = np.linalg.norm(
         box_shift(
-            coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :], 
+            coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :],  # type: ignore
             cells[..., np.newaxis, np.newaxis, :, :]
         ), 
         ord = 2, axis = -1
@@ -166,7 +166,7 @@ def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
 
 
 def _check_coords(coords: np.ndarray, cells: np.ndarray, eps: float) -> bool:
-    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :])
+    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :]) # type: ignore # type: ignore
     mask = np.linalg.norm(delta, 2, axis = -1) < eps
     np.fill_diagonal(mask, False)
     return not mask.any()
@@ -180,8 +180,8 @@ def check_coords(coords: np.ndarray, cells: np.ndarray, eps: float):
         return _check_coords(c, b, eps)
     return np.apply_along_axis(check, axis = -1, arr = c)
 
-def filter_confs(confs: dpdata.System, tensor: np.ndarray = None):
-    mask = check_coords(confs["coords"], confs["cells"], eps = 1e-3)
+def filter_confs(confs: dpdata.System, tensor: Optional[np.ndarray] = None):
+    mask = check_coords(confs["coords"], confs["cells"], eps = 1e-3) # type: ignore
     confs = confs.sub_system(np.nonzero(mask)[0].tolist())
     if tensor is not None:
         tensor = tensor[mask, ...]
@@ -199,7 +199,7 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int):
     return corr
 '''
 
-def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int = None):
+def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: Optional[int] = None):
     if A.ndim == 1 or B.ndim == 1:
         A = A.reshape(-1, 1)
         B = B.reshape(-1, 1)
@@ -208,18 +208,17 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int = None):
     assert n <= min(A.shape[0], B.shape[0]), "The number of steps is too large!"
     v1 = np.concatenate([A[:n][::-1], np.zeros([window, A.shape[1]], dtype = np.float32)], axis = 0)
     v2 = B[:n + window]
-    corr = np.fft.ifft(np.fft.fft(v1, axis = 0) * np.fft.fft(v2, axis = 0), axis = 0).real
+    corr = np.fft.ifft(np.fft.fft(v1, axis = 0) * np.fft.fft(v2, axis = 0), axis = 0).real # type: ignore
     corr = corr[n - 1:n + window] / n
     return corr
 
-def apply_gussian_filter(corr: np.ndarray, width: int):
+def apply_gussian_filter(corr: np.ndarray, width: float):
     nmax = corr.shape[0] - 1
     return corr * np.exp(-.5 * (0.5 * width * np.arange(nmax + 1) / nmax)**2)
 
 def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
     NMAX = C.shape[0] - 1
-    if NMAX % 2 != 0:
-        return
+    assert NMAX % 2 == 0
     TMAX = NMAX * DT
     NU = np.arange(NMAX + 1)
     OMEGA = NU * DOM
@@ -268,15 +267,15 @@ def FT(DT: float, C: np.ndarray) -> np.ndarray:
     GAMMA[0] = 4. / 3.
     BETA[1:] /= THCUB[1:]
     GAMMA[1:] /= THCUB[1:]
-    CE = np.fft.fft(C[:-1:2]).real + 0.5 * (C[NMAX] - C[0])
-    CO = (np.fft.fft(C[1::2]) * np.exp(-THETA[:int(NMAX / 2)] * 1j)).real
+    CE = np.fft.fft(C[:-1:2]).real + 0.5 * (C[NMAX] - C[0]) # type: ignore
+    CO = (np.fft.fft(C[1::2]) * np.exp(-THETA[:int(NMAX / 2)] * 1j)).real # type: ignore
     CE = np.concatenate([CE, CE, CE[0:1]])
     CO = np.concatenate([CO, -CO, CO[0:1]])
     CHAT = 2.0 * (BETA * CE + GAMMA * CO) * DT
     return CHAT
 
 def numerical_diff(y: np.ndarray, h: float):
-    g = (y[2:] - y[:-2]) / (2 * h)
+    g = (y[2:] - y[:-2]) / (2 * h) # type: ignore
     g3, g4   = diff_8(g[:8])    # approx g[3], g[4]
     gn5, gn4 = diff_8(g[-8:])   # approx g[-4], g[-5]
     g[4] += (gn5 - g3) / 6.
@@ -284,7 +283,7 @@ def numerical_diff(y: np.ndarray, h: float):
     g = g[4:-4]
     v = np.zeros((g.shape[0], 1))
     v[0] = -2; v[1] = 1; v[-1] = 1
-    return np.fft.ifft(np.fft.fft(g, axis = 0) / (1 + np.fft.fft(v, axis = 0) / 6), axis = 0).real
+    return np.fft.ifft(np.fft.fft(g, axis = 0) / (1 + np.fft.fft(v, axis = 0) / 6), axis = 0).real # type: ignore
 
 def diff_8(g):
     w = np.array([336./2911., -1344./2911., 5040./2911., -1350./2911., 360./2911., -90./2911.])
@@ -304,6 +303,8 @@ def get_executor(exec_config: dict) -> Executor:
                 "input_data": exec_config["params"],
             },
         },)
+    else:
+        raise NotImplementedError(f"Unknown executor type: {exec_config['type']}")
 
 
 def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int = 50000):
@@ -311,7 +312,7 @@ def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int =
     nAtoms = int(np.loadtxt(f_dump, dtype = int, skiprows = 3, max_rows = 1))
     print("Number of atoms =", nAtoms)
     types = np.loadtxt(f_dump, dtype = int, skiprows = 5, max_rows = nAtoms, usecols = [1]) - 1
-    np.save(f_types, types)
+    np.save(f_types, types) # type: ignore
 
     f_dump.seek(0, 0)
     step = 0
@@ -357,12 +358,12 @@ def read_lmp_dump(dump_file: Path, BUFFER: int = 50000) -> Dict[str, np.ndarray]
         f_types.seek(0, 0)
         sys["atom_types"] = np.load(f_types).reshape(-1)
     finally:
-        f_cells.close()
-        f_coords.close()
-        f_types.close()
+        f_cells.close() # type: ignore
+        f_coords.close() # type: ignore
+        f_types.close() # type: ignore
     return sys
 
-def dump_to_fmt(name: Union[str, Path], confs: Optional[dpdata.System], fmt: str, *args, in_fmt: dict = None, **kwargs):
+def dump_to_fmt(name: Union[str, Path], confs: Optional[dpdata.System], fmt: str, *args, in_fmt: Optional[dict] = None, **kwargs):
     if isinstance(name, str):
         conf_path = Path(name)
     else:
