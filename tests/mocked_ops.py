@@ -13,6 +13,10 @@ class MockedPrepare(Prepare):
                     wc_python: Optional[ModuleType] = None) -> Dict[str, Union[str, dict]]:
         self.task_path = []
         self.conf_path = []
+        if wc_python is not None:
+            print(wc_python.__name__)
+            assert isinstance(wc_python, ModuleType)
+            self.wc_python = wc_python
         return super().init_inputs(mlwf_setting, confs)
     
     def prep_one_frame(self, frame: int):

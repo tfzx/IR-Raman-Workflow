@@ -1,3 +1,4 @@
+import numpy as np
 from mocked_ops import MockedPrepare
 import unittest, shutil, os
 from pathlib import Path
@@ -9,7 +10,12 @@ class TestPrepare(unittest.TestCase):
     def setUp(self) -> None:
         super().setUp()
         self.confs = Path("tests/data.qe/test.001/data").absolute()
+        self.conf_fmt = {
+            "fmt": "deepmd/raw",
+            "type_map": ["O", "H"]
+        }
         self.pseudo = Path("tests/data.qe/test.001/pseudo").absolute()
+        self.wc_python_path = Path("tests/data.qe/test.001/cal_dipole.py").absolute()
         self.work_dir = Path("tests/tmp")
         self.work_dir.mkdir()
         self.last_cwd = os.getcwd()
@@ -21,18 +27,17 @@ class TestPrepare(unittest.TestCase):
             shutil.rmtree(self.work_dir)
         return super().tearDown()
 
-    def run_t(self, group_size: int):
+    def run_t(self, group_size: int, if_cal_python: bool = False):
         prepare = MockedPrepare()
         op_in = OPIO({
             "mlwf_setting": {},
             "task_setting": {"group_size": group_size},
             "confs": self.confs,
-            "conf_fmt": {
-                "fmt": "deepmd/raw",
-                "type_map": ["O", "H"]
-            },
+            "conf_fmt": self.conf_fmt,
             "pseudo": self.pseudo
         })
+        if if_cal_python:
+            op_in["cal_dipole_python"] = self.wc_python_path
         op_out = prepare.execute(op_in)
         task_path = op_out["task_path"]
         frames_list = op_out["frames_list"]
@@ -65,3 +70,11 @@ class TestPrepare(unittest.TestCase):
         self.assertListEqual(prepare.task_path, [f"task.{i:06d}" for i in [0, 0, 0, 0]])
         self.assertEqual(len(task_path), 1)
         self.assertListEqual(frames_list, [(0, 4)])
+    
+    def test_wc_python(self):
+        prepare, task_path, frames_list = self.run_t(1, if_cal_python = True)
+        self.assertListEqual(prepare.conf_path, [f"conf.{i:06d}" for i in range(4)])
+        self.assertListEqual(prepare.task_path, [f"task.{i:06d}" for i in [0, 1, 2, 3]])
+        self.assertEqual(len(task_path), 4)
+        self.assertListEqual(frames_list, [(0, 1), (1, 2), (2, 3), (3, 4)])
+        self.assert_(prepare.wc_python.test())
