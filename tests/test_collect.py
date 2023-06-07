@@ -28,7 +28,7 @@ class TestCollect(unittest.TestCase):
 
 
     def test_collect_all_success(self):
-        collect_op = MockedCollectWFC()
+        collect_op = MockedCollectWFC(success_list = [True, True])
         ori_confs = read_conf(self.confs, self.conf_fmt)
         op_in = {
             "mlwf_setting": {},
@@ -55,10 +55,7 @@ class TestCollect(unittest.TestCase):
         op_in = {
             "mlwf_setting": {},
             "confs": self.confs,
-            "conf_fmt": {
-                "fmt": "deepmd/raw",
-                "type_map": ["O", "H"]
-            },
+            "conf_fmt": self.conf_fmt,
             "backward": self.backs
         }
         op_out = collect_op.execute(op_in)
@@ -86,10 +83,7 @@ class TestCollect(unittest.TestCase):
         op_in = {
             "mlwf_setting": {},
             "confs": self.confs,
-            "conf_fmt": {
-                "fmt": "deepmd/raw",
-                "type_map": ["O", "H"]
-            },
+            "conf_fmt": self.conf_fmt,
             "backward": self.backs
         }
         self.assertRaises(AssertionError, collect_op.execute, op_in)
