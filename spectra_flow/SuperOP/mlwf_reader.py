@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 from copy import deepcopy
 from spectra_flow.utils import complete_by_default
 
@@ -26,7 +26,7 @@ class MLWFReaderQeW90:
             "scf_params": {
                 "control": {
                     "restart_mode"  : "from_scratch",
-                    "prefix"        : "h2o",
+                    "prefix"        : "name",
                     "outdir"        : "out",
                     "pseudo_dir"    : "../../pseudo",
                 },
@@ -88,18 +88,18 @@ class MLWFReaderQeW90:
         return self.mlwf_setting["dft_params"] # type: ignore
 
     @property
-    def scf_params(self) -> Dict[str, Dict[str, Union[str, float, bool]]]:
+    def scf_params(self) -> Dict[str, Any]:
         if "scf_params" in self.dft_params:
             return self.dft_params["scf_params"]
         else:
             return self.dft_params["qe_params"] # TODO: will be deprecated
 
     @property
-    def nscf_params(self) -> Dict[str, Dict[str, Union[str, float, bool]]]:
+    def nscf_params(self) -> Optional[Dict[str, Any]]:
         return self.dft_params.get("nscf_params", None)
 
     @property
-    def pw2wan_params(self):
+    def pw2wan_params(self) -> dict:
         return self.dft_params["pw2wan_params"]
 
     @property
@@ -111,7 +111,7 @@ class MLWFReaderQeW90:
         return self.mlwf_setting.get("multi_w90_params", None) # type: ignore
 
     @property
-    def atomic_species(self) -> Dict[str, Dict[str, Union[str, float]]]:
+    def atomic_species(self) -> Optional[Dict[str, Dict[str, Union[str, float]]]]:
         return self.dft_params.get("atomic_species", None)
 
     @property
@@ -164,7 +164,7 @@ class MLWFReaderQeW90:
 
     def get_qe_params_dict(self):
         scf_params = self.scf_params
-        qe_params_dict: Dict[str, dict] = {}
+        qe_params_dict: Dict[str, Dict[str, Any]] = {} # TODO: write into mlwf_setting
         if self.with_efield:
             ef_type = self.ef_type
             qe_params_dict["ori"] = self.complete_ef(scf_params, efield = None, ef_type = ef_type, is_ori = True)

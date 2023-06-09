@@ -46,6 +46,7 @@ class PrepareQeWann(Prepare):
         nscf_params = mlwf.nscf_params
         pw2wan_params = mlwf.pw2wan_params
         atomic_species = mlwf.atomic_species
+        assert atomic_species is not None, "atomic_species is None!"
         qe_params_dict = mlwf.get_qe_params_dict()
 
         rewrite_atoms, rewrite_proj = self.get_w90_rewriter(wc_python)
@@ -89,15 +90,16 @@ class PrepareQeWann(Prepare):
         return mlwf.mlwf_setting
 
     def prep_one_frame(self, frame: int):
-        seed_name = self.mlwf.seed_name
+        mlwf = self.mlwf
         for qe_key in self.scf_writers:
             with set_directory(qe_key, mkdir = True): # type: ignore
-                Path(f"scf_{qe_key}.in").write_text(self.scf_writers[qe_key].write(frame))
-                if self.mlwf.run_nscf:
-                    Path(f"nscf_{qe_key}.in").write_text(self.nscf_writers[qe_key].write(frame))
+                Path(mlwf.scf_name(qe_key)).write_text(self.scf_writers[qe_key].write(frame))
+                if mlwf.run_nscf:
+                    Path(mlwf.nscf_name(qe_key)).write_text(self.nscf_writers[qe_key].write(frame))
                 for w90_key in self.pw2wan_writers[qe_key]:
-                    Path(f"{seed_name(qe_key, w90_key)}.pw2wan").write_text(self.pw2wan_writers[qe_key][w90_key].write(frame))
-                    Path(f"{seed_name(qe_key, w90_key)}.win").write_text(self.wannier90_writers[qe_key][w90_key].write(frame))
+                    seed_name = mlwf.seed_name(qe_key, w90_key)
+                    Path(f"{seed_name}.pw2wan").write_text(self.pw2wan_writers[qe_key][w90_key].write(frame))
+                    Path(f"{seed_name}.win").write_text(self.wannier90_writers[qe_key][w90_key].write(frame))
 
 class RunQeWann(RunMLWF):
     DEFAULT_BACK = []
@@ -149,7 +151,10 @@ class RunQeWann(RunMLWF):
                 qe_key = f"ef_{ef_name}"
                 with set_directory(qe_key): # type: ignore
                     if ef_type == "enthalpy":
-                        shutil.copytree(ori_out_dir, out_dir)
+                        try:
+                            shutil.copytree(ori_out_dir, out_dir)
+                        except Exception as e:
+                            print(f"Cannot copy the 'out' dir to restart: {e}")
                     self.run_one_subtask(qe_key, back_abs, out_dir)
 
 class CollectWann(CollectWFC):
