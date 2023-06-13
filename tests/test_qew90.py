@@ -1,5 +1,5 @@
 from pathlib import Path
-from typing import Dict, Union
+from typing import Dict, Optional, Union
 import numpy as np, dpdata
 from spectra_flow.SuperOP.mlwf_reader import MLWFReaderQeW90
 from spectra_flow.mlwf.qe_wannier90 import PrepareQeWann, RunQeWann
@@ -57,6 +57,45 @@ class TestReader(unittest.TestCase):
             mlwf.get_w90_params_dict(),
             {"": mlwf.w90_params}
         )
+        self.assertDictEqual(
+            mlwf.get_qe_params_dict(),
+            {"ori": mlwf.scf_params}
+        )
+
+    def test_multi_w90(self):
+        mlwf_setting = {
+            "name": "test",
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            },
+            "multi_w90_params": {
+                "w1": {},
+                "w2": {}
+            }
+        }
+        mlwf = MLWFReaderQeW90(mlwf_setting)
+        self.assertEqual(mlwf.name, "test")
+        self.assertTrue(mlwf.run_nscf)
+        self.assertListEqual(mlwf.qe_iter, ["ori"])
+        self.assertIsNotNone(mlwf.dft_params)
+        self.assertIsNotNone(mlwf.scf_params)
+        self.assertIsNotNone(mlwf.nscf_params)
+        self.assertIsNotNone(mlwf.pw2wan_params)
+        self.assertIsNone(mlwf.w90_params)
+        self.assertIsNotNone(mlwf.multi_w90_params)
+        self.assertIsNotNone(mlwf.atomic_species)
+        self.assertFalse(mlwf.with_efield)
+        self.assertIsNone(mlwf.efields)
+        self.assertTrue(mlwf.ef_type == "enthalpy")
+        scf_grid, nscf_grid = mlwf.get_kgrid()
+        self.assertTupleEqual(scf_grid, (1, 1, 1))
+        self.assertTupleEqual(nscf_grid, (1, 1, 1))
+        w90_p_d = mlwf.get_w90_params_dict()
+        self.assertSetEqual({"w1", "w2"}, set(w90_p_d.keys()))
+        self.assertIsInstance(w90_p_d["w1"], dict)
+        self.assertIsInstance(w90_p_d["w2"], dict)
+        self.assertTrue(w90_p_d["w1"])
+        self.assertTrue(w90_p_d["w2"])
         self.assertDictEqual(
             mlwf.get_qe_params_dict(),
             {"ori": mlwf.scf_params}
@@ -287,6 +326,144 @@ class TestPrepareQeW90(unittest.TestCase):
         self.assertTrue((ori_path / f"{mlwf.seed_name('ori', '')}.win").exists())
 
 
+
+class TestRunQeW90Subtask(unittest.TestCase):
+    def setUp(self) -> None:
+        self.last_cwd = os.getcwd()
+        self.work_dir = Path("tests/tmp")
+        self.work_dir.mkdir()
+        self.back_dir = (self.work_dir / Path("back")).absolute()
+        self.back_dir.mkdir()
+        self.ori_task = self.work_dir / Path("ori")
+        self.ori_task.mkdir()
+        self.tar_out = (self.work_dir / Path("ori_out")).absolute()
+        os.chdir(self.ori_task)
+        self.out_dir = Path("test_out")
+        self.out_dir.mkdir()
+        return super().setUp()
+    
+    def tearDown(self) -> None:
+        os.chdir(self.last_cwd)
+        if self.work_dir.is_dir():
+            shutil.rmtree(self.work_dir)
+        return super().tearDown()
+    
+    @mock.patch.object(RunQeWann, "run")
+    def test_subtask_1(self, mock_run: mock.Mock):
+        mlwf_setting: Dict[str, Union[str, dict]] = {
+            "name": "test",
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            }
+        }
+        MLWFReaderQeW90(mlwf_setting)
+        Path("scf_ori.in").write_text("test scf!")
+        Path("nscf_ori.in").write_text("test nscf!")
+        Path("test_ori_.pw2wan").write_text("test pw2wan!")
+        Path("test_ori_.win").write_text("test w90!")
+        w90_xyz = Path("test_ori__centres.xyz")
+        w90_xyz.write_text("test!")
+
+        run = RunQeWann(debug = True)
+        run.init_cmd(mlwf_setting, {})
+        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = False, tar_dir = self.tar_out)
+        mock_run.assert_called()
+        self.assertEqual(mock_run.call_count, 5)
+        for call_args in mock_run.call_args_list:
+            self.assertIsInstance(call_args[0][0], str)
+        self.assertTrue((self.back_dir / w90_xyz).exists())
+        self.assertFalse(self.tar_out.exists())
+
+    @mock.patch.object(RunQeWann, "run")
+    def test_subtask_2(self, mock_run: mock.Mock):
+        mlwf_setting: Dict[str, Union[str, dict]] = {
+            "name": "test",
+            "dft_params": {
+                "cal_type": "scf"
+            },
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            }
+        }
+        MLWFReaderQeW90(mlwf_setting)
+        Path("scf_ori.in").write_text("test scf!")
+        Path("test_ori_.pw2wan").write_text("test pw2wan!")
+        Path("test_ori_.win").write_text("test w90!")
+        w90_xyz = Path("test_ori__centres.xyz")
+        w90_xyz.write_text("test!")
+
+        run = RunQeWann(debug = True)
+        run.init_cmd(mlwf_setting, {})
+        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = False, tar_dir = self.tar_out)
+        mock_run.assert_called()
+        self.assertEqual(mock_run.call_count, 4)
+        for call_args in mock_run.call_args_list:
+            self.assertIsInstance(call_args[0][0], str)
+        self.assertTrue((self.back_dir / w90_xyz).exists())
+        self.assertFalse(self.tar_out.exists())
+
+    @mock.patch.object(RunQeWann, "run")
+    def test_subtask_3(self, mock_run: mock.Mock):
+        mlwf_setting: Dict[str, Union[str, dict]] = {
+            "name": "test",
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            }
+        }
+        MLWFReaderQeW90(mlwf_setting)
+        Path("scf_ori.in").write_text("test scf!")
+        Path("nscf_ori.in").write_text("test nscf!")
+        Path("test_ori_.pw2wan").write_text("test pw2wan!")
+        Path("test_ori_.win").write_text("test w90!")
+        w90_xyz = Path("test_ori__centres.xyz")
+        w90_xyz.write_text("test!")
+
+        run = RunQeWann(debug = True)
+        run.init_cmd(mlwf_setting, {})
+        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = True, tar_dir = self.tar_out)
+        mock_run.assert_called()
+        self.assertEqual(mock_run.call_count, 5)
+        for call_args in mock_run.call_args_list:
+            self.assertIsInstance(call_args[0][0], str)
+        self.assertTrue((self.back_dir / w90_xyz).exists())
+        self.assertTrue(self.tar_out.exists())
+
+    @mock.patch.object(RunQeWann, "run")
+    def test_subtask_4(self, mock_run: mock.Mock):
+        mlwf_setting: Dict[str, Union[str, dict]] = {
+            "name": "test",
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            },
+            "multi_w90_params": {
+                "w1": {},
+                "w2": {}
+            }
+        }
+        MLWFReaderQeW90(mlwf_setting)
+        Path("scf_ori.in").write_text("test scf!")
+        Path("nscf_ori.in").write_text("test nscf!")
+        Path("test_ori_w1.pw2wan").write_text("test pw2wan w1!")
+        Path("test_ori_w1.win").write_text("test w90 w1!")
+        w90_w1_xyz = Path("test_ori_w1_centres.xyz")
+        w90_w1_xyz.write_text("test!")
+        Path("test_ori_w2.pw2wan").write_text("test pw2wan w2!")
+        Path("test_ori_w2.win").write_text("test w90 w2!")
+        w90_w2_xyz = Path("test_ori_w2_centres.xyz")
+        w90_w2_xyz.write_text("test!")
+
+        run = RunQeWann(debug = True)
+        run.init_cmd(mlwf_setting, {})
+        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = True, tar_dir = self.tar_out)
+        mock_run.assert_called()
+        self.assertEqual(mock_run.call_count, 8)
+        for call_args in mock_run.call_args_list:
+            self.assertIsInstance(call_args[0][0], str)
+        self.assertTrue((self.back_dir / w90_w1_xyz).exists())
+        self.assertTrue((self.back_dir / w90_w2_xyz).exists())
+        self.assertTrue(self.tar_out.exists())
+
+
 class TestRunQeW90(unittest.TestCase):
     def setUp(self) -> None:
         self.work_dir = Path("tests/tmp")
@@ -313,7 +490,7 @@ class TestRunQeW90(unittest.TestCase):
             }
         }
         MLWFReaderQeW90(mlwf_setting, if_copy = False)
-        run = RunQeWann()
+        run = RunQeWann(debug = True)
         run.init_cmd(mlwf_setting, {})
         run.run_one_frame(self.back_dir)
         mock_run.assert_called_once()
@@ -325,22 +502,24 @@ class TestRunQeW90(unittest.TestCase):
             self.assertFalse(call_args[3])
         if "copy_out" in call_kwargs:
             self.assertFalse(call_kwargs["copy_out"])
-    
-class TestRunQeW90Subtask(unittest.TestCase):
+
+
+class TestRunQeW90Ef(unittest.TestCase):
     def setUp(self) -> None:
-        self.last_cwd = os.getcwd()
         self.work_dir = Path("tests/tmp")
         self.work_dir.mkdir()
-        self.back_dir = (self.work_dir / Path("back")).absolute()
+        self.last_cwd = os.getcwd()
+        os.chdir(self.work_dir)
+        self.back_dir = Path("back")
         self.back_dir.mkdir()
-        self.ori_task = self.work_dir / Path("ori")
+        self.ori_task = Path("ori")
         self.ori_task.mkdir()
-        self.tar_out = (self.work_dir / Path("ori_out")).absolute()
-        os.chdir(self.ori_task)
-        self.out_dir = Path("test_out")
+        self.out_dir = self.ori_task / Path("out")
         self.out_dir.mkdir()
-        self.w90_xyz = Path("test_ori__centres.xyz")
-        self.w90_xyz.write_text("test!")
+        self.test_x_task = Path("ef_test_x")
+        self.test_x_task.mkdir()
+        self.test_y_task = Path("ef_test_y")
+        self.test_y_task.mkdir()
         return super().setUp()
     
     def tearDown(self) -> None:
@@ -349,76 +528,74 @@ class TestRunQeW90Subtask(unittest.TestCase):
             shutil.rmtree(self.work_dir)
         return super().tearDown()
     
-    @mock.patch.object(RunQeWann, "run")
-    def test_subtask_1(self, mock_run: mock.Mock):
+    @classmethod
+    def run_subtask_se(cls, qe_key, back: Path, out_dir: Path, 
+            copy_out: bool = False, tar_dir: Optional[Path] = None):
+        if copy_out and tar_dir:
+            shutil.copytree(out_dir, tar_dir)
+
+    @mock.patch.object(RunQeWann, "run_one_subtask")
+    def test_run_1(self, mock_run: mock.Mock):
+        mock_run.side_effect = self.run_subtask_se
         mlwf_setting: Dict[str, Union[str, dict]] = {
-            "name": "test",
             "kmesh": {
                 "scf_grid": (1, 1, 1)
-            }
-        }
-        MLWFReaderQeW90(mlwf_setting)
-        Path("scf_ori.in").write_text("test scf!")
-        Path("nscf_ori.in").write_text("test nscf!")
-        Path("test_ori_.pw2wan").write_text("test pw2wan!")
-        Path("test_ori_.win").write_text("test w90!")
-
-        run = RunQeWann()
-        run.init_cmd(mlwf_setting, {})
-        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = False, tar_dir = self.tar_out)
-        mock_run.assert_called()
-        self.assertEqual(mock_run.call_count, 5)
-        for call_args in mock_run.call_args_list:
-            self.assertIsInstance(call_args[0][0], str)
-        self.assertTrue((self.back_dir / self.w90_xyz).exists())
-        self.assertFalse(self.tar_out.exists())
-
-    @mock.patch.object(RunQeWann, "run")
-    def test_subtask_2(self, mock_run: mock.Mock):
-        mlwf_setting: Dict[str, Union[str, dict]] = {
-            "name": "test",
-            "dft_params": {
-                "cal_type": "scf"
             },
-            "kmesh": {
-                "scf_grid": (1, 1, 1)
-            }
+            "with_efield": True,
+            "efields": {
+                "test_x": [0.1, 0, 0],
+                "test_y": [0, 0.1, 0],
+            },
+            "ef_type": "enthalpy"
         }
-        MLWFReaderQeW90(mlwf_setting)
-        Path("scf_ori.in").write_text("test scf!")
-        Path("test_ori_.pw2wan").write_text("test pw2wan!")
-        Path("test_ori_.win").write_text("test w90!")
-
-        run = RunQeWann()
+        MLWFReaderQeW90(mlwf_setting, if_copy = False)
+        run = RunQeWann(debug = True)
         run.init_cmd(mlwf_setting, {})
-        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = False, tar_dir = self.tar_out)
-        mock_run.assert_called()
-        self.assertEqual(mock_run.call_count, 4)
-        for call_args in mock_run.call_args_list:
-            self.assertIsInstance(call_args[0][0], str)
-        self.assertTrue((self.back_dir / self.w90_xyz).exists())
-        self.assertFalse(self.tar_out.exists())
+        run.run_one_frame(self.back_dir)
+        self.assertEqual(mock_run.call_count, 3)
+        name_list = {"ori", "ef_test_x", "ef_test_y"}
+        copy_out_l = [True, False, False]
+        for call_args, call_kwargs in mock_run.call_args_list:
+            print(call_args)
+            self.assertIn(call_args[0], name_list)
+            name_list.remove(call_args[0])
+            self.assertIsInstance(call_args[1], Path)
+            self.assertIsInstance(call_args[2], Path)
+            if len(call_args) > 3:
+                self.assertEqual(call_args[3], copy_out_l.pop(0))
+            elif "copy_out" in call_kwargs:
+                self.assertEqual(call_kwargs["copy_out"], copy_out_l.pop(0))
+        self.assertEqual(len(name_list), 0)
 
-    @mock.patch.object(RunQeWann, "run")
-    def test_subtask_3(self, mock_run: mock.Mock):
+    @mock.patch.object(RunQeWann, "run_one_subtask")
+    def test_run_2(self, mock_run: mock.Mock):
+        mock_run.side_effect = self.run_subtask_se
         mlwf_setting: Dict[str, Union[str, dict]] = {
-            "name": "test",
             "kmesh": {
                 "scf_grid": (1, 1, 1)
-            }
+            },
+            "with_efield": True,
+            "efields": {
+                "test_x": [1, 0.1],
+                "test_y": [2, 0.1],
+            },
+            "ef_type": "saw"
         }
-        MLWFReaderQeW90(mlwf_setting)
-        Path("scf_ori.in").write_text("test scf!")
-        Path("nscf_ori.in").write_text("test nscf!")
-        Path("test_ori_.pw2wan").write_text("test pw2wan!")
-        Path("test_ori_.win").write_text("test w90!")
-
-        run = RunQeWann()
+        MLWFReaderQeW90(mlwf_setting, if_copy = False)
+        run = RunQeWann(debug = True)
         run.init_cmd(mlwf_setting, {})
-        run.run_one_subtask("ori", self.back_dir, self.out_dir, copy_out = True, tar_dir = self.tar_out)
-        mock_run.assert_called()
-        self.assertEqual(mock_run.call_count, 5)
-        for call_args in mock_run.call_args_list:
-            self.assertIsInstance(call_args[0][0], str)
-        self.assertTrue((self.back_dir / self.w90_xyz).exists())
-        self.assertTrue(self.tar_out.exists())
+        run.run_one_frame(self.back_dir)
+        self.assertEqual(mock_run.call_count, 3)
+        name_list = {"ori", "ef_test_x", "ef_test_y"}
+        copy_out_l = [False, False, False]
+        for call_args, call_kwargs in mock_run.call_args_list:
+            print(call_args)
+            self.assertIn(call_args[0], name_list)
+            name_list.remove(call_args[0])
+            self.assertIsInstance(call_args[1], Path)
+            self.assertIsInstance(call_args[2], Path)
+            if len(call_args) > 3:
+                self.assertEqual(call_args[3], copy_out_l.pop(0))
+            elif "copy_out" in call_kwargs:
+                self.assertEqual(call_kwargs["copy_out"], copy_out_l.pop(0))
+        self.assertEqual(len(name_list), 0)
