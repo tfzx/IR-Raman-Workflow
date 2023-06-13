@@ -98,7 +98,8 @@ class Prepare(OP, abc.ABC):
 
 class RunMLWF(OP, abc.ABC):
     DEFAULT_BACK = []
-    def __init__(self) -> None:
+    def __init__(self, debug = False) -> None:
+        self.debug = debug
         super().__init__()
     
     @classmethod
@@ -151,6 +152,8 @@ class RunMLWF(OP, abc.ABC):
                         self.run_one_frame(backward_dir)
                     except Exception as e:
                         print(f"[ERROR] Frame {frame:06d} failed: {e}")
+                        if self.debug:
+                            raise e
                     self._collect(backward_dir, backward_list)
                     backward.append(task_path / conf_path / backward_dir)
         return backward
@@ -166,11 +169,12 @@ class RunMLWF(OP, abc.ABC):
         shutil.copy(self.log_path, backward_dir)
 
     def run(self, *args, **kwargs):
-        kwargs["print_oe"] = True
-        kwargs["raise_error"] = False
+        if "print_oe" not in kwargs:
+            kwargs["print_oe"] = True
         ret, out, err = run_command(*args, **kwargs)
         if ret != 0:
-            print(f"[WARNING] Exception return of command {kwargs['cmd']}: \n{err}")
+            print(f"[WARNING] Exceptional return of command {kwargs['cmd']}: return code = {ret}")
+            print(f"[WARNING] {err}")
         #     assert ret == 0
         # Save log here.
         with self.log_path.open(mode = "a") as fp:
