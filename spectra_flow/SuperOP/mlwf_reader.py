@@ -70,10 +70,7 @@ class MLWFReaderQeW90:
         else:
             for key in self.multi_w90_params:
                 complete_by_default(
-                    self.multi_w90_params,
-                    {
-                        key: self.DEFAULT_W90
-                    }
+                    self.multi_w90_params[key], self.DEFAULT_W90
                 )
 
     @property

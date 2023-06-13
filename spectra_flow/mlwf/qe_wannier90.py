@@ -103,9 +103,6 @@ class PrepareQeWann(Prepare):
 
 class RunQeWann(RunMLWF):
     DEFAULT_BACK = []
-    def __init__(self) -> None:
-        super().__init__()
-
     def init_cmd(self, mlwf_setting: Dict[str, Union[str, dict]], commands: Dict[str, str]):
         self.mlwf = MLWFReaderQeW90(mlwf_setting)
         self.pw_cmd = commands.get("pw", "pw.x")
@@ -119,6 +116,7 @@ class RunQeWann(RunMLWF):
         mlwf = self.mlwf
         scf_name = mlwf.scf_name(qe_key)
         nscf_name = mlwf.nscf_name(qe_key)
+        assert Path(scf_name).exists(), f"Qe scf input file '{scf_name}' doesn't exist!"
         self.run(" ".join([self.pw_cmd, "-input", scf_name]))
         if copy_out and tar_dir:
             shutil.copytree(out_dir, tar_dir)
@@ -126,9 +124,11 @@ class RunQeWann(RunMLWF):
             self.run(" ".join([self.pw_cmd, "-input", nscf_name]))
         for w90_key in mlwf.get_w90_params_dict():
             seed_name = mlwf.seed_name(qe_key, w90_key)
+            assert Path(f"{seed_name}.win").exists(), f"Wannier90 input file '{seed_name}.win' doesn't exist!"
+            assert Path(f"{seed_name}.pw2wan").exists(), f"Qe pw2wannier90 input file '{seed_name}.pw2wan' doesn't exist!"
             self.run(" ".join([self.wannier_cmd, "-pp", seed_name]))
             self.run(" ".join([self.pw2wan_cmd]), input=Path(f"{seed_name}.pw2wan").read_text())
-            self.run(" ".join([self.wannier_cmd, seed_name]))
+            self.run(" ".join([self.wannier_cmd, seed_name]), raise_error = False)
             shutil.copy(f"{seed_name}_centres.xyz", back)
         shutil.rmtree(out_dir)
 
@@ -154,7 +154,9 @@ class RunQeWann(RunMLWF):
                         try:
                             shutil.copytree(ori_out_dir, out_dir)
                         except Exception as e:
-                            print(f"Cannot copy the 'out' dir to restart: {e}")
+                            print(f"[WARNING] Cannot copy the outdir to restart: {e}")
+                            if self.debug:
+                                raise e
                     self.run_one_subtask(qe_key, back_abs, out_dir)
 
 class CollectWann(CollectWFC):
