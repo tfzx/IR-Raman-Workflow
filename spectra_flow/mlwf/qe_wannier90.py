@@ -16,17 +16,43 @@ from spectra_flow.SuperOP.mlwf_reader import MLWFReaderQeW90
 
 class PrepareQeWann(Prepare):
     """
-        Do MLWF by Qe-Pwscf and Wannier90. 
-        ----------
-        Support calculation with electric fields.
-        Prepare the inputs file for each frame:
-            - `scf.in`
-            - `nscf.in` (optional. If `cal_type == "scf+nscf"`, this file will be generated.)
-            - `{name}.pw2wan`
-            - `{name}.win`
+    Description
+    -----
+    Generate input files for Qe-Pwscf and Wannier90. 
+    Support calculation with electric fields.
+
+    Generate
+    -----
+    Prepare the inputs file for each frame.
+    There might be multiple qe runs (for example, add different electric fields),
+    and each qe run will generate a directory to place the corresponding input files.
+    -----
+    The input files for each qe run:
+        - `scf_{qe_key}.in`
+        - `nscf_{qe_key}.in` (optional. If `cal_type == "scf+nscf"`, this file will be generated.)
+        - `{seed_name}.pw2wan` 
+        - `{seed_name}.win`
+
+    Notice that if there are multiple wannier90 runs (defined by `multi_w90_params`), 
+    each dir will generate a `seed_name` and the corresponding `.pw2wan` and `.win` files.
+    -----
+    An example of the file structure:
+    ```txt
+    task.000000
+    `-- conf.000000
+        |-- ori
+        |   |-- scf_ori.in
+        |   |-- nscf_ori.in
+        |   |-- graphene_ori_pz.pw2wan
+        |   |-- graphene_ori_pz.win
+        |   |-- graphene_ori_sp2.pw2wan
+        |   `-- graphene_ori_sp2.win
+        `-- ef_x
+    ```
     """
     @classmethod
     def get_w90_rewriter(cls, wc_python: Optional[ModuleType] = None):
+        """Try to import functions `rewrite_atoms` and `rewrite_proj` from `wc_python` and return them."""
         rewrite_atoms = None; rewrite_proj = None
         if wc_python is not None:
             try:
@@ -40,6 +66,30 @@ class PrepareQeWann(Prepare):
         return rewrite_atoms, rewrite_proj
 
     def get_writers(self, mlwf: MLWFReaderQeW90, confs: dpdata.System, wc_python: Optional[ModuleType]):
+        """
+        Description
+        -----
+        Get `scf_writers`, `nscf_writers`, `pw2wan_writers` and `wannier90_writers` from `mlwf`,
+        and save them as the attributes.
+
+        Parameters:
+        -----
+        mlwf: `MLWFReaderQeW90`. The `mlwf_setting` wrapper.
+
+        confs: `dpdata.System`. The system.
+
+        wc_python: `ModuleType`, optional.
+            If provided, this will try to import functions `rewrite_atoms` and `rewrite_proj` from it.
+            See `spectra_flow.mlwf.inputs.Wannier90Inputs` for details.
+
+        Attributes:
+        -----
+        All the attributes below was defined in method `init_inputs`.
+        - scf_writers: `Dict[str, QeParamsConfs]`
+        - nscf_writers: `Dict[str, QeParamsConfs]`
+        - pw2wan_writers: `Dict[str, Dict[str, QeParams]]`
+        - wannier90_writers: `Dict[str, Dict[str, Wannier90Inputs]]`
+        """
         w90_params_dict = mlwf.get_w90_params_dict()
         scf_grid, nscf_grid = mlwf.get_kgrid()
         w90_kgrid = nscf_grid if mlwf.run_nscf else scf_grid
@@ -76,9 +126,6 @@ class PrepareQeWann(Prepare):
                 )
 
     def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: Optional[ModuleType]):
-        """
-            Each dir runs one qe calculations (scf+[nscf]) and some wannier90 calculations.
-        """
         mlwf = MLWFReaderQeW90(mlwf_setting, if_copy = False)
         self.scf_writers: Dict[str, QeParamsConfs] = {}
         if mlwf.run_nscf:
@@ -90,6 +137,9 @@ class PrepareQeWann(Prepare):
         return mlwf.mlwf_setting
 
     def prep_one_frame(self, frame: int):
+        """
+            Each dir runs one qe calculations (scf+[nscf]) and some wannier90 calculations.
+        """
         mlwf = self.mlwf
         for qe_key in self.scf_writers:
             with set_directory(qe_key, mkdir = True): # type: ignore
@@ -102,6 +152,16 @@ class PrepareQeWann(Prepare):
                     Path(f"{seed_name}.win").write_text(self.wannier90_writers[qe_key][w90_key].write(frame))
 
 class RunQeWann(RunMLWF):
+    """
+    Description
+    -----
+    Run Qe-Pwscf and Wannier90. 
+    Support calculation with electric fields.
+
+    See Also
+    -----
+    `spectra_flow.mlwf.qe_wannier90.PrepareQeWann`
+    """
     DEFAULT_BACK = []
     def init_cmd(self, mlwf_setting: Dict[str, Union[str, dict]], commands: Dict[str, str]):
         self.mlwf = MLWFReaderQeW90(mlwf_setting)
@@ -113,6 +173,9 @@ class RunQeWann(RunMLWF):
             self, qe_key, back: Path, out_dir: Path, 
             copy_out: bool = False, tar_dir: Optional[Path] = None
         ):
+        """
+            Each dir runs one qe calculations (scf+[nscf]) and some wannier90 calculations.
+        """
         mlwf = self.mlwf
         scf_name = mlwf.scf_name(qe_key)
         nscf_name = mlwf.nscf_name(qe_key)
@@ -160,6 +223,16 @@ class RunQeWann(RunMLWF):
                     self.run_one_subtask(qe_key, back_abs, out_dir)
 
 class CollectWann(CollectWFC):
+    """
+    Description
+    -----
+    Collect wfc from `*_centres.xyz` generated by Wannier90. 
+    Support calculation with electric fields.
+
+    See Also
+    -----
+    `spectra_flow.mlwf.qe_wannier90.PrepareQeWann`
+    """
     def init_params(self, mlwf_setting: dict, conf_sys: dpdata.System, example_file: Path):
         self.mlwf = MLWFReaderQeW90(mlwf_setting)
         self.nat = len(conf_sys["atom_types"])
