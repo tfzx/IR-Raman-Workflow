@@ -2,10 +2,11 @@ from pathlib import Path
 from typing import Dict, Optional, Union
 import numpy as np, dpdata
 from spectra_flow.SuperOP.mlwf_reader import MLWFReaderQeW90
-from spectra_flow.mlwf.qe_wannier90 import PrepareQeWann, RunQeWann
+from spectra_flow.mlwf.qe_wannier90 import PrepareQeWann, RunQeWann, CollectWann
 import unittest, shutil, os, imp
 from unittest import mock
 from spectra_flow.utils import read_conf
+from dflow.utils import set_directory
 
 class TestReader(unittest.TestCase):
     def test_default(self):
@@ -599,3 +600,74 @@ class TestRunQeW90Ef(unittest.TestCase):
             elif "copy_out" in call_kwargs:
                 self.assertEqual(call_kwargs["copy_out"], copy_out_l.pop(0))
         self.assertEqual(len(name_list), 0)
+
+class TestCollectW90(unittest.TestCase):
+    def setUp(self) -> None:
+        self.confs = Path("tests/data.qe/test.003/data").absolute()
+        self.conf_fmt = {
+            "fmt": "deepmd/raw",
+            "type_map": ["O", "H"]
+        }
+        self.conf_sys = read_conf(self.confs, self.conf_fmt)
+        self.wfc_file = Path("tests/data.qe/test.003/back/water_centres.xyz").absolute()
+        self.work_dir = Path("tests/tmp")
+        self.work_dir.mkdir()
+        self.last_cwd = os.getcwd()
+        os.chdir(self.work_dir)
+        self.back_dir = Path("back")
+        self.back_dir.mkdir()
+        shutil.copy(self.wfc_file, self.back_dir / "water_ori__centres.xyz")
+        shutil.copy(self.wfc_file, self.back_dir / "water_ef_test_x__centres.xyz")
+        shutil.copy(self.wfc_file, self.back_dir / "water_ef_test_y__centres.xyz")
+        return super().setUp()
+    
+    def tearDown(self) -> None:
+        os.chdir(self.last_cwd)
+        if self.work_dir.is_dir():
+            shutil.rmtree(self.work_dir)
+        return super().tearDown()
+
+    def test_1(self):
+        collect = CollectWann()
+        mlwf_setting: Dict[str, Union[str, dict]] = {
+            "name": "water",
+            "dft_params": {
+                "cal_type": "scf"
+            },
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            }
+        }
+        collect.init_params(mlwf_setting, self.conf_sys, self.back_dir)
+
+        with set_directory(self.back_dir):
+            wfc = collect.get_one_frame()
+        self.assertSetEqual(set(wfc.keys()), {"ori"})
+        self.assertIsInstance(wfc["ori"], np.ndarray)
+        self.assertEqual(wfc["ori"].size, 256 * 3)
+
+    def test_2(self):
+        collect = CollectWann()
+        mlwf_setting: Dict[str, Union[str, dict]] = {
+            "name": "water",
+            "dft_params": {
+                "cal_type": "scf"
+            },
+            "kmesh": {
+                "scf_grid": (1, 1, 1)
+            },
+            "with_efield": True,
+            "efields": {
+                "test_x": [1, 0.1],
+                "test_y": [2, 0.1],
+            },
+            "ef_type": "saw"
+        }
+        collect.init_params(mlwf_setting, self.conf_sys, self.back_dir)
+
+        with set_directory(self.back_dir):
+            wfc = collect.get_one_frame()
+        self.assertSetEqual(set(wfc.keys()), {"ori", "ef_test_x", "ef_test_y"})
+        for wfc_v in wfc.values():
+            self.assertIsInstance(wfc_v, np.ndarray)
+            self.assertEqual(wfc_v.size, 256 * 3)
