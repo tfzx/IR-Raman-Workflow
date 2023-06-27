@@ -34,7 +34,6 @@ if __name__ == "__main__":
         cal_executor = cal_executor
     )
 
-    import spectra_flow.post.cal_dipole
     cal_dipole_step = Step(
         name = "Dipole-Step",
         template = dipole_template,

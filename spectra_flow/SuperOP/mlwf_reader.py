@@ -4,7 +4,7 @@ from spectra_flow.utils import complete_by_default
 
 class MLWFReaderQeW90:
     """
-        This class is a tool to read the mlwf_setting of qe+wannier90.
+        This class is a wrapper to read the mlwf_setting of qe+wannier90.
     """
     DEFAULT_MLWF = {
         "name": "name",
@@ -43,18 +43,19 @@ class MLWFReaderQeW90:
             "guiding_centres": True
         }
     }
-    def __init__(self, mlwf_setting: Dict[str, Union[str, dict]], if_copy = True) -> None:
+    def __init__(self, mlwf_setting: Dict[str, Union[str, dict]], if_copy = True, if_print = False) -> None:
         self.mlwf_setting = deepcopy(mlwf_setting) if if_copy else mlwf_setting
         self.name = self.mlwf_setting.get("name", "name")
-        self.default()
+        self._default()
         self.run_nscf: bool = self.dft_params["cal_type"] == "scf+nscf"
-        import json
-        print(json.dumps(self.mlwf_setting, indent=4))
+        if if_print:
+            import json
+            print(json.dumps(self.mlwf_setting, indent=4))
         # if "num_wann" in mlwf_setting["wannier90_params"]["wan_params"]:
         #     mlwf_setting["num_wann"] = mlwf_setting["wannier90_params"]["wan_params"]["num_wann"]
         pass
 
-    def default(self):
+    def _default(self):
         self.DEFAULT_QE["dft_params"]["scf_params"]["control"]["prefix"] = self.name
         complete_by_default(self.mlwf_setting, self.DEFAULT_MLWF)
         if "qe_params" in self.dft_params and "scf_params" not in self.dft_params:
