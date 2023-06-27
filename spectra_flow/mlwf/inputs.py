@@ -7,6 +7,7 @@ import abc
 from spectra_flow.utils import kmesh, complete_by_default, recurcive_update
 
 class QeInputs(abc.ABC):
+    names_order = []
     def __init__(self) -> None:
         pass
 
@@ -15,27 +16,19 @@ class QeInputs(abc.ABC):
         pass
 
     @classmethod
-    def write_configuration(cls, conf: dpdata.System, atoms: Optional[np.ndarray] = None):
-        if atoms is None:
-            atoms = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]] # type: ignore
-        cells = np.reshape(conf["cells"], (3, 3)) # type: ignore
-        coords = np.reshape(conf["coords"], (-1, 3)) # type: ignore
+    def write_namelists(cls, input_params: Dict[str, Optional[dict]]):
+        namelists = {}
+        for key in input_params:
+            if key.lower() in cls.names_order:
+                namelists[key.lower()] = input_params[key]  # convert to the uppercase.
+
         with TemporaryFile("w+") as f:
-            f.write("\nCELL_PARAMETERS { angstrom }\n")
-            np.savetxt(f, cells, fmt = "%15.8f")
-            f.write("\nATOMIC_POSITIONS { angstrom }\n")
-            atomic_positions = np.concatenate([atoms, np.char.mod("%15.8f", coords)], axis = 1) # type: ignore
-            np.savetxt(f, atomic_positions, fmt = "%s")
-            f.seek(0)
-            conf_str = f.read()
-        return conf_str
-    
-    @classmethod
-    def write_parameters(cls, input_params: dict, atomic_species: Optional[dict] = None, 
-                          kpoints: Optional[dict] = None, optional_input: Optional[str] = None):
-        with TemporaryFile("w+") as f:
-            for key, val in input_params.items():
-                if val is None or len(val) == 0:
+            for key in cls.names_order:
+                if key in namelists:
+                    val = namelists[key]
+                else:
+                    continue
+                if not val:
                     f.writelines([f"&{key}\n", "/\n"])
                     continue
                 f.write(f"&{key}\n")
@@ -49,52 +42,176 @@ class QeInputs(abc.ABC):
                         val2 = "'none'"
                     f.write(f"    {key2} = {val2},\n")
                 f.write("/\n")
-            if atomic_species is not None:
-                f.write("\nATOMIC_SPECIES\n")
-                for atom, info in atomic_species.items():
-                    f.write(f"{atom} {info['mass']} {info['pseudo']}\n")
-            if kpoints is not None:
-                kpoint_type: str = kpoints["type"].strip()
-                f.write(f"\nK_POINTS { kpoint_type }\n")
-                if kpoint_type == "crystal":
-                    k_points = kpoints["k_points"]
-                    f.write(f"{k_points.shape[0]}\n")
-                    np.savetxt(f, k_points, fmt = "%15.8f")
-                elif kpoint_type == "automatic":
-                    nk1, nk2, nk3 = kpoints["k_grid"]
-                    sk1, sk2, sk3 = kpoints.get("offset", (0, 0, 0))
-                    f.write(f"{nk1} {nk2} {nk3} {sk1} {sk2} {sk3}\n")
-                else:
-                    raise NotImplementedError("Unsupported kpoint type!")
-            if optional_input is not None:
-                f.write(optional_input)
-                f.write("\n")
             f.seek(0)
-            params_str = f.read()
-        return params_str
+            namelists_str = f.read()
+        return namelists_str
 
-class QeParamsConfs(QeInputs):
+    @classmethod
+    def write_species(cls, atomic_species: Optional[dict] = None):
+        if atomic_species is None:
+            return ""
+        with TemporaryFile("w+") as f:
+            f.write("ATOMIC_SPECIES\n")
+            for atom, info in atomic_species.items():
+                f.write(f"{atom} {info['mass']} {info['pseudo']}\n")
+            f.seek(0)
+            species_str = f.read()
+        return species_str
+
+    @classmethod
+    def write_conf(cls, conf: dpdata.System, atom_names: Optional[np.ndarray] = None):
+        """
+        Description
+        -----
+        Write the cards `CELL_PARAMETERS` and `ATOMIC_POSITIONS`.
+        The unit is angstrom.
+
+        Parameters
+        ------
+        conf: `dpdata.System`.
+            The configuration (one frame).
+
+        atoms: `np.ndarray`, optional.
+            The name of atoms. If not provided, this will be read from `conf["atom_names"]`.
+        
+        Return
+        -----
+        conf_str: `str`
+            A string containing the cards `CELL_PARAMETERS` and `ATOMIC_POSITIONS`.
+        """
+        if atom_names is None:
+            atom_names = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]] # type: ignore
+        else:
+            atom_names = atom_names.reshape(-1, 1)
+        cells = np.reshape(conf["cells"], (3, 3)) # type: ignore
+        coords = np.reshape(conf["coords"], (-1, 3)) # type: ignore
+        with TemporaryFile("w+") as f:
+            f.write("CELL_PARAMETERS { angstrom }\n")
+            np.savetxt(f, cells, fmt = "%15.8f")
+            f.write("\n")
+            f.write("ATOMIC_POSITIONS { angstrom }\n")
+            atomic_positions = np.concatenate([atom_names, np.char.mod("%15.8f", coords)], axis = 1) # type: ignore
+            np.savetxt(f, atomic_positions, fmt = "%s")
+            f.write("\n")
+            f.seek(0)
+            conf_str = f.read()
+        return conf_str
+    
+    @classmethod
+    def write_kpoints(cls, kpoints: Optional[dict] = None):
+        if kpoints is None:
+            return ""
+        with TemporaryFile("w+") as f:
+            kpoint_type: str = kpoints["type"].strip()
+            f.write(f"K_POINTS { kpoint_type }\n")
+            if kpoint_type == "crystal":
+                k_points = kpoints["k_points"]
+                f.write(f"{k_points.shape[0]}\n")
+                np.savetxt(f, k_points, fmt = "%15.8f")
+            elif kpoint_type == "automatic":
+                nk1, nk2, nk3 = kpoints["k_grid"]
+                sk1, sk2, sk3 = kpoints.get("offset", (0, 0, 0))
+                f.write(f"{nk1} {nk2} {nk3} {sk1} {sk2} {sk3}\n")
+            else:
+                raise NotImplementedError(f"Unsupported kpoint type {kpoint_type}.")
+            f.write("\n")
+            f.seek(0)
+            kpoints_str = f.read()
+        return kpoints_str
+
+    # @classmethod
+    # def write_parameters(cls, input_params: dict, atomic_species: Optional[dict] = None, 
+    #                       kpoints: Optional[dict] = None, optional_input: Optional[str] = None):
+    #     with TemporaryFile("w+") as f:
+    #         for key, val in input_params.items():
+    #             if val is None or len(val) == 0:
+    #                 f.writelines([f"&{key}\n", "/\n"])
+    #                 continue
+    #             f.write(f"&{key}\n")
+    #             assert isinstance(val, dict)
+    #             for key2, val2 in val.items():
+    #                 if isinstance(val2, bool):
+    #                     val2 = "." + str(val2).lower() + "."
+    #                 elif isinstance(val2, str):
+    #                     val2 = f"'{val2}'"
+    #                 elif val2 is None:
+    #                     val2 = "'none'"
+    #                 f.write(f"    {key2} = {val2},\n")
+    #             f.write("/\n")
+    #         if atomic_species is not None:
+    #             f.write("\nATOMIC_SPECIES\n")
+    #             for atom, info in atomic_species.items():
+    #                 f.write(f"{atom} {info['mass']} {info['pseudo']}\n")
+    #         if kpoints is not None:
+    #             kpoint_type: str = kpoints["type"].strip()
+    #             f.write(f"\nK_POINTS { kpoint_type }\n")
+    #             if kpoint_type == "crystal":
+    #                 k_points = kpoints["k_points"]
+    #                 f.write(f"{k_points.shape[0]}\n")
+    #                 np.savetxt(f, k_points, fmt = "%15.8f")
+    #             elif kpoint_type == "automatic":
+    #                 nk1, nk2, nk3 = kpoints["k_grid"]
+    #                 sk1, sk2, sk3 = kpoints.get("offset", (0, 0, 0))
+    #                 f.write(f"{nk1} {nk2} {nk3} {sk1} {sk2} {sk3}\n")
+    #             else:
+    #                 raise NotImplementedError("Unsupported kpoint type!")
+    #         if optional_input is not None:
+    #             f.write(optional_input)
+    #             f.write("\n")
+    #         f.seek(0)
+    #         params_str = f.read()
+    #     return params_str
+
+class QePwInputs(QeInputs):
+    names_order = ["control", "system", "electrons", "ions", "cell", "fcp", "rism"]
     def __init__(self, input_params: Dict[str, Optional[dict]], kpoints: Optional[dict], 
                  atomic_species: dict, confs: dpdata.System, optional_input: Optional[str] = None) -> None:
         super().__init__()
-        """
-        Automatically complemant the system info("ntyp" and "nat") to input parmeters, and generate the kpoints by calculation type. 
-        If cal = "scf", then kpoints will be "automatic". Otherwise kpoints will be "crystal" type. 
-        """
-        self.params_str = self.write_parameters(input_params, atomic_species, kpoints, optional_input)
+        self.namelists_str = self.write_namelists(input_params)
+        self.species_str = self.write_species(atomic_species)
+        self.kpoints_str = self.write_kpoints(kpoints)
+        self.optional_input = optional_input if optional_input is not None else ""
         self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]] # type: ignore
         self.confs = confs
 
     def write(self, frame: int):
-        return "\n".join([self.params_str, self.write_configuration(self.confs[frame], self.atoms)])
+        return "\n".join([
+            self.namelists_str, 
+            self.species_str, 
+            self.write_conf(self.confs[frame], self.atoms),
+            self.kpoints_str, 
+            self.optional_input
+        ])
 
-class QeParams(QeInputs):
+class QeCPInputs(QeInputs):
+    names_order = ["control", "system", "electrons", "ions", "cell", "wannier"]
+    def __init__(self, input_params: Dict[str, Optional[dict]], kpoints: Optional[dict], 
+                 atomic_species: dict, confs: dpdata.System, optional_input: Optional[str] = None) -> None:
+        super().__init__()
+        self.namelists_str = self.write_namelists(input_params)
+        self.species_str = self.write_species(atomic_species)
+        self.kpoints_str = self.write_kpoints(kpoints)
+        self.optional_input = optional_input if optional_input is not None else ""
+        self.atoms = np.array(confs["atom_names"]).reshape(-1, 1)[confs["atom_types"]] # type: ignore
+        self.confs = confs
+
+    def write(self, frame: int):
+        return "\n".join([
+            self.namelists_str, 
+            self.species_str, 
+            self.write_conf(self.confs[frame], self.atoms),
+            self.kpoints_str, 
+            self.optional_input
+        ])
+
+class QePw2wanInputs(QeInputs):
+    names_order = ["inputpp"]
     def __init__(self, input_params: Dict[str, dict]) -> None:
         super().__init__()
-        self.params_str = self.write_parameters(input_params)
+        self.namelists_str = self.write_namelists(input_params)
     
     def write(self, frame: int):
-        return self.params_str
+        return self.namelists_str
 
 class Wannier90Inputs:
     def __init__(
@@ -130,10 +247,10 @@ class Wannier90Inputs:
             proj_str = self.proj_str
         else:
             proj_str = self.write_proj(self.rewrite_proj(conf))
-        return "\n".join([self.params_str, self.kpoints_str, proj_str, self.write_configuration(conf, atoms)])
+        return "\n".join([self.params_str, proj_str, self.kpoints_str, self.write_conf(conf, atoms)])
 
     @classmethod
-    def write_configuration(cls, conf: dpdata.System, atoms: Optional[np.ndarray] = None):
+    def write_conf(cls, conf: dpdata.System, atoms: Optional[np.ndarray] = None):
         if atoms is None:
             atoms = np.array(conf["atom_names"]).reshape(-1, 1)[conf["atom_types"]] # type: ignore
         cells = np.reshape(conf["cells"], (3, 3)) # type: ignore
@@ -196,6 +313,10 @@ class Wannier90Inputs:
 def complete_qe(input_params: Dict[str, Optional[dict]], calculation: Optional[str] = None, 
                 k_grid: Optional[Tuple[int, int, int]] = None, 
                 confs: Optional[dpdata.System] = None):
+    """
+    Copy and complete the system info ("ntyp" and "nat") to input parmeters, and generate the kpoints by calculation type. 
+    If `calculation` = "scf", then kpoints will be "automatic". Otherwise kpoints will be "crystal" type. 
+    """
     input_params_default: Dict[str, dict] = {}
     if calculation:
         input_params_default["control"] = {
@@ -223,6 +344,9 @@ def complete_qe(input_params: Dict[str, Optional[dict]], calculation: Optional[s
     return input_params, kpoints
 
 def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlwf", outdir: str = "out"):
+    """
+    Copy the params and complete `outdir`, `prefix` and `seedname`.
+    """
     input_params = deepcopy(input_params)
     input_params["inputpp"].update({
         "outdir" : outdir,
@@ -232,19 +356,17 @@ def complete_pw2wan(input_params: Dict[str, dict], name: str, prefix: str = "mlw
     return input_params
 
 def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int, int, int]):
+    """
+    Copy the `wan_params` and complete the `mp_grid`, generate the projection and kpoints.
+    Check whether `num_wann <= num_bands`, if they are provided.
+    """
     wan_params = deepcopy(wan_params)
     wan_params["mp_grid"] = "{}, {}, {}".format(*k_grid)
     if "num_bands" in wan_params and "num_wann" in wan_params:
         if wan_params["num_wann"] > wan_params["num_bands"]:
-            raise RuntimeError(
+            raise AssertionError(
                 f"num_wann = {wan_params['num_wann']}, which is greater than num_bands = {wan_params['num_bands']}"
             )
-        # elif wan_params["num_wann"] < wan_params["num_bands"] and "select_projections" not in wan_params:
-        #     print("*" * 10)
-        #     print("[WARNING] num_wann < num_bands, but select_projections were not given!")
-        #     print(f"[WARNING] Select 1-{wan_params['num_wann']} by default!")
-        #     print("*" * 10)
-            # wan_params["select_projections"] = f"1-{wan_params['num_wann']}"
     if proj is not None and len(proj) == 0:
         proj = None
     kpoints = kmesh(*k_grid)[:, :3]
@@ -255,15 +377,15 @@ def complete_wannier90(wan_params: dict, proj: Optional[dict], k_grid: Tuple[int
 
 def get_qe_writers(
         confs: dpdata.System,
-        scf_grid: Optional[Tuple[int, int, int]],
-        nscf_grid: Optional[Tuple[int, int, int]],
+        scf_grid: Tuple[int, int, int],
+        nscf_grid: Tuple[int, int, int],
         scf_params: Dict[str, Optional[dict]],
         nscf_params: Optional[Dict[str, dict]],
         atomic_species: Dict[str, Dict[str, Union[str, float]]],
         run_nscf: bool = True
     ):
     input_scf, kpoints_scf = complete_qe(scf_params, "scf", scf_grid, confs)
-    scf_writer = QeParamsConfs(input_scf, kpoints_scf, atomic_species, confs)
+    scf_writer = QePwInputs(input_scf, kpoints_scf, atomic_species, confs)
     nscf_writer = None; input_nscf = None
     if run_nscf:
         _nscf_params = deepcopy(scf_params)
@@ -271,7 +393,7 @@ def get_qe_writers(
             recurcive_update(_nscf_params, nscf_params)
         _nscf_params["control"]["restart_mode"] = "from_scratch"  # type: ignore
         input_nscf, kpoints_nscf = complete_qe(_nscf_params, "nscf", nscf_grid, confs)
-        nscf_writer = QeParamsConfs(input_nscf, kpoints_nscf, atomic_species, confs)
+        nscf_writer = QePwInputs(input_nscf, kpoints_nscf, atomic_species, confs)
     return scf_writer, nscf_writer, input_scf, input_nscf
 
 def get_pw_w90_writers(
@@ -300,7 +422,7 @@ def get_pw2wan_writer(
         input_scf["control"]["prefix"], # type: ignore
         input_scf["control"]["outdir"]  # type: ignore
     )
-    return QeParams(input_pw2wan)
+    return QePw2wanInputs(input_pw2wan)
 
 def get_w90_writer(
         confs: dpdata.System,
@@ -325,13 +447,13 @@ def get_w90_writer(
     )
     if w90_params.get("rewrite_atoms", False):
         if rewrite_atoms is None:
-            print(f"[WARNING] 'rewrite_atoms' is True but cannot importing the method!")
+            print(f"[WARNING] 'rewrite_atoms' is True but cannot import the method!")
             print("Use default atom names.")
     else:
         rewrite_atoms = None
     if w90_params.get("rewrite_proj", False):
         if rewrite_proj is None:
-            print(f"[WARNING] 'rewrite_proj' is True but cannot importing the method!")
+            print(f"[WARNING] 'rewrite_proj' is True but cannot import the method!")
             print("Use projections defined in wannier90_params.")
     else:
         rewrite_proj = None

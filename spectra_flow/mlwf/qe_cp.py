@@ -3,7 +3,7 @@ from types import ModuleType
 from pathlib import Path
 import dpdata, numpy as np
 from spectra_flow.mlwf.mlwf_ops import Prepare, RunMLWF, CollectWFC
-from spectra_flow.mlwf.inputs import QeParamsConfs, complete_qe
+from spectra_flow.mlwf.inputs import QeCPInputs, complete_qe
 from spectra_flow.utils import complete_by_default
 
 
@@ -27,7 +27,7 @@ class PrepareCP(Prepare):
         self.name = mlwf_setting["name"]
         qe_params = complete_by_default(mlwf_setting["dft_params"]["qe_params"], params_default = self.DEFAULT_PARAMS) # type: ignore
         input_cp, _ = complete_qe(qe_params, "cp-wf", None, confs)
-        self.cp_writer = QeParamsConfs(input_cp, None, mlwf_setting["dft_params"]["atomic_species"], confs) # type: ignore
+        self.cp_writer = QeCPInputs(input_cp, None, mlwf_setting["dft_params"]["atomic_species"], confs) # type: ignore
         return mlwf_setting
 
     def prep_one_frame(self, frame: int):

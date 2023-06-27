@@ -6,8 +6,8 @@ import dpdata, numpy as np
 from dflow.utils import set_directory
 from spectra_flow.mlwf.mlwf_ops import Prepare, RunMLWF, CollectWFC
 from spectra_flow.mlwf.inputs import (
-    QeParamsConfs, 
-    QeParams, 
+    QePwInputs, 
+    QePw2wanInputs, 
     Wannier90Inputs, 
     get_qe_writers,
     get_pw_w90_writers
@@ -126,11 +126,11 @@ class PrepareQeWann(Prepare):
                 )
 
     def init_inputs(self, mlwf_setting: Dict[str, Union[str, dict]], confs: dpdata.System, wc_python: Optional[ModuleType]):
-        mlwf = MLWFReaderQeW90(mlwf_setting, if_copy = False)
-        self.scf_writers: Dict[str, QeParamsConfs] = {}
+        mlwf = MLWFReaderQeW90(mlwf_setting, if_copy = False, if_print = True)
+        self.scf_writers: Dict[str, QePwInputs] = {}
         if mlwf.run_nscf:
-            self.nscf_writers: Dict[str, QeParamsConfs] = {}
-        self.pw2wan_writers: Dict[str, Dict[str, QeParams]] = {}
+            self.nscf_writers: Dict[str, QePwInputs] = {}
+        self.pw2wan_writers: Dict[str, Dict[str, QePw2wanInputs]] = {}
         self.wannier90_writers: Dict[str, Dict[str, Wannier90Inputs]] = {}
         self.get_writers(mlwf, confs, wc_python)
         self.mlwf = mlwf
