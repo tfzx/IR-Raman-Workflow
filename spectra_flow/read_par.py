@@ -59,6 +59,7 @@ def read_par(parameters: Dict[str, dict]):
     file_config_list = [
         ("dp_setting", "train_inputs"),
         ("mlwf_setting", ),
+        ("polar_setting", ),
         ("task_setting", )
     ]
     for keys in file_config_list:
