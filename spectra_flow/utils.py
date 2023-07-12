@@ -200,10 +200,31 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int):
 '''
 
 def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: Optional[int] = None):
+    """
+    Calculate the correlation function: <A(0)*B(t)>. Here, A(t) and B(t) is a d-dimensional vector, 
+    and A(t) * B(t) is the element-wise production, and the result is also a d-dimensional vector.
+
+    Parameters
+    -----
+    A, B: np.ndarray, in shape of (num_t, d).
+        The first dimension refers to the time, and the second dimension refers to the dimension of the vector.
+    
+    window: int.
+        the width of window to approximate the ensemble average.
+        <A(0)*B(t)> = 1 / window * \sum_{i = 0}^{window - 1} A(i)*B(t + i)
+
+    n: int, Optional.
+        Maximal time steps.
+    
+    Return
+    -----
+    corr: np.ndarray, in shape of (n, d).
+        corr(t) = <A(0)*B(t)>
+    """
     if A.ndim == 1 or B.ndim == 1:
         A = A.reshape(-1, 1)
         B = B.reshape(-1, 1)
-    if not n:
+    if n is None:
         n = min(A.shape[0], B.shape[0]) - window
     assert n <= min(A.shape[0], B.shape[0]), "The number of steps is too large!"
     v1 = np.concatenate([A[:n][::-1], np.zeros([window, A.shape[1]], dtype = np.float32)], axis = 0)
@@ -217,6 +238,45 @@ def apply_gussian_filter(corr: np.ndarray, width: float):
     return corr * np.exp(-.5 * (0.5 * width * np.arange(nmax + 1) / nmax)**2)
 
 def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
+    """
+    Calculates the Fourier cosine transform by Filon's method.
+    A correlation function, C(t), in the time domain, is
+    transformed to a spectrum CHAT(OMEGA) in the frequency domain.
+
+    Usage:
+
+    The routine requires that the number of intervals, nmax, is
+    even and checks for this condition. The first value of c(t)
+    is at t=0. The maximum time for the correlation function is
+    tmax=dt*nmax. For an accurate transform c(tmax)=0.
+
+    Parameters
+    ------
+    C: ndarray, the correlation function.
+    DT: float, time interval between points in C.
+    DOM: float, frequency interval for CHAT.
+
+    Return
+    -----
+    CHAT: ndarray, the 1-d cosine transform.
+
+    Reference:
+    -----
+    FILON, proc roy soc edin, 49 38, 1928.
+    """
+    """
+    Principal variables:
+    NMAX: int,
+        number of intervals on the time axis
+    OMEGA: ndarray[float],
+        the frequency
+    TMAX: float,
+        maximum time in corrl. function
+    ALPHA, BETA, GAMMA: ndarray[float],
+        filon parameters
+    NU: ndarray[int],
+        frequency index
+    """
     NMAX = C.shape[0] - 1
     assert NMAX % 2 == 0
     TMAX = NMAX * DT
@@ -249,7 +309,8 @@ def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
 
 def FT(DT: float, C: np.ndarray) -> np.ndarray:
     """
-    The same as FILONC while DOM = 2. * np.pi / tmax
+    The same as FILONC while DOM = 2. * np.pi / tmax.
+    This is implemented by FFT.
     """
     NMAX = C.shape[0] - 1
     assert NMAX % 2 == 0, 'NMAX is not even!'
