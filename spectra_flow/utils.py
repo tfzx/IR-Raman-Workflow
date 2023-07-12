@@ -73,6 +73,16 @@ def conf_from_npz(raw_conf, type_map: Optional[List[str]] = None):
     return dpdata.System(data = conf_data)
 
 def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
+    """
+    Read confs by the format dict `conf_fmt`.
+
+    Parameters
+    -----
+    conf_path: Path. The path to the confs.
+
+    conf_fmt: dict.
+        `{"fmt": "format, empty by default", "type_map": "None by default"}`
+    """
     fmt: str = conf_fmt.get("fmt", "") # type: ignore
     type_map: List[str] = conf_fmt.get("type_map", None) # type: ignore
     fmt = fmt.strip()
@@ -139,6 +149,9 @@ def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.nd
     return np.argsort(distance, axis = -1)[..., :k]
 
 def inv_cells(cells: np.ndarray):
+    """
+    Reciprocal cells.
+    """
     inv_cells = np.zeros_like(cells)
     inv_cells[..., :, 0] = np.cross(cells[..., 1, :], cells[..., 2, :])
     inv_cells[..., :, 1] = np.cross(cells[..., 2, :], cells[..., 0, :])
@@ -148,10 +161,16 @@ def inv_cells(cells: np.ndarray):
     return inv_cells
 
 def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    """
+    Transfer from the cartesian coordinate to fractional coordinate.
+    """
     recip_cell = inv_cells(cells)
     return np.sum(coords[..., np.newaxis] * recip_cell, axis = -2)
 
 def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    """
+    Shift the coordinates (dx) to the coordinates that have the smallest absolute value.
+    """
     frac_c = to_frac(dx, cells)[..., np.newaxis]
     return dx - np.sum(np.round(frac_c) * cells, axis = -2)
     # nl = np.floor(np.sum(dx[..., np.newaxis] * recip_cell, axis = -2) * 2)[..., np.newaxis]
@@ -181,6 +200,9 @@ def check_coords(coords: np.ndarray, cells: np.ndarray, eps: float):
     return np.apply_along_axis(check, axis = -1, arr = c)
 
 def filter_confs(confs: dpdata.System, tensor: Optional[np.ndarray] = None):
+    """
+    Filter the confs to remove the conf that some atoms are too close.
+    """
     mask = check_coords(confs["coords"], confs["cells"], eps = 1e-3) # type: ignore
     confs = confs.sub_system(np.nonzero(mask)[0].tolist())
     if tensor is not None:
@@ -234,6 +256,9 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: Optional[int] =
     return corr
 
 def apply_gussian_filter(corr: np.ndarray, width: float):
+    """
+    Apply gaussian filter. Parameter width means the smoothing width.
+    """
     nmax = corr.shape[0] - 1
     return corr * np.exp(-.5 * (0.5 * width * np.arange(nmax + 1) / nmax)**2)
 
@@ -247,8 +272,8 @@ def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
 
     The routine requires that the number of intervals, nmax, is
     even and checks for this condition. The first value of c(t)
-    is at t=0. The maximum time for the correlation function is
-    tmax=dt*nmax. For an accurate transform c(tmax)=0.
+    is at t = 0. The maximum time for the correlation function is
+    tmax = dt * nmax. For an accurate transform c(tmax)=0.
 
     Parameters
     ------
@@ -356,6 +381,9 @@ def diff_8(g):
     return g_3, g_4
 
 def get_executor(exec_config: dict) -> Executor:
+    """
+    Get executor. Only support bohrium now.
+    """
     if exec_config["type"] == "bohrium":
         return DispatcherExecutor(machine_dict = {
             "batch_type": "Bohrium",
@@ -404,6 +432,9 @@ def _read_dump(f_dump: IO, f_cells: IO, f_coords: IO, f_types: IO, BUFFER: int =
     return step
 
 def read_lmp_dump(dump_file: Path, BUFFER: int = 50000) -> Dict[str, np.ndarray]:
+    """
+    Read the lammps/dump file line by line. This is for cases when dump file is too large to totally read into RAM.
+    """
     try:
         f_cells = TemporaryFile('r+')
         f_coords = TemporaryFile('r+')
@@ -425,6 +456,9 @@ def read_lmp_dump(dump_file: Path, BUFFER: int = 50000) -> Dict[str, np.ndarray]
     return sys
 
 def dump_to_fmt(name: Union[str, Path], confs: Optional[dpdata.System], fmt: str, *args, in_fmt: Optional[dict] = None, **kwargs):
+    """
+    Dump the system (or configurations) into the specified format, and return the format dict.
+    """
     if isinstance(name, str):
         conf_path = Path(name)
     else:
