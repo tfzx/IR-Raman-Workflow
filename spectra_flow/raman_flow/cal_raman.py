@@ -17,9 +17,9 @@ def calculate_corr_polar(polar: np.ndarray, window: int):
     polar_iso -= np.mean(polar_iso, axis = 0, keepdims = True)
     polar_aniso -= np.mean(polar_aniso, axis = 0, keepdims = True)
 
-    corr_iso = calculate_corr(polar_iso, polar_iso, window)
+    corr_iso = np.sum(calculate_corr(polar_iso, polar_iso, window), axis = -1)
     polar_aniso = polar_aniso.reshape(-1, 9)
-    corr_aniso = calculate_corr(polar_aniso, polar_aniso, window)
+    corr_aniso = np.sum(calculate_corr(polar_aniso, polar_aniso, window), axis = -1)
     corr_aniso *= 2 / 15
     return corr_iso, corr_aniso
 
