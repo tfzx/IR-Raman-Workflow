@@ -24,7 +24,7 @@ from spectra_flow.mlwf.qe_cp import (
     RunCPWF,
     CollectCPWF
 )
-import spectra_flow
+import spectra_flow, json
 from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
 from spectra_flow.SuperOP.polar_steps import PolarSteps
 from spectra_flow.dp.dp_train import DPolarTrain
@@ -88,6 +88,7 @@ def build_raman(
         run_config: Optional[dict] = None, 
         upload_python_packages = None, 
         with_parallel = True,
+        parallelism: Optional[int] = None,
         debug = False
     ):
     executors = {}
@@ -104,12 +105,18 @@ def build_raman(
         run_list = run_list,
         given_inputs = inputs.keys(),
         with_parallel = with_parallel,
+        parallelism = parallelism,
         debug = debug
     )
     in_p = raman_template.input_parameters
     in_a = raman_template.input_artifacts
     input_parameters = {key: inputs[key] for key in in_p if key in inputs}
     input_artifacts_path = {key: inputs[key] for key in in_a if key in inputs}
+    if debug:
+        print("-" * 20 + " parameters " + "-" * 20)
+        print(json.dumps(input_parameters, indent = 4))
+        print("-" * 20 + " artifacts path " + "-" * 20)
+        print(json.dumps(input_artifacts_path, indent = 4))
     input_artifacts = {}
     for in_key, path in input_artifacts_path.items():
         input_artifacts[in_key] = upload_artifact(path)
@@ -183,6 +190,7 @@ class RamanFlow(AdaptiveFlow):
             given_inputs: Optional[Iterable[str]] = None, 
             pri_source: Optional[str] = None, 
             with_parallel: bool = True,
+            parallelism: Optional[int] = None,
             debug: bool = False
         ):
         self.run_config = run_config
@@ -194,6 +202,7 @@ class RamanFlow(AdaptiveFlow):
         }
         if upload_python_packages is None:
             upload_python_packages = []
+        self._parallelism = parallelism
         up_py_set = set(upload_python_packages)
         up_py_set.update(spectra_flow.__path__)
         self.upload_python_packages = list(up_py_set)
@@ -246,7 +255,8 @@ class RamanFlow(AdaptiveFlow):
             self.executors["base"],
             self.executors["run"],
             self.executors["cal"],
-            self.upload_python_packages
+            self.upload_python_packages,
+            parallelism = self._parallelism
         )
         return PolarSteps(
             "Cal-Polar",
