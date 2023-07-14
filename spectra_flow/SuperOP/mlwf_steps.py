@@ -79,7 +79,7 @@ class MLWFSteps(SuperOP):
             run_executor,
             collect_executor,
             upload_python_packages,
-            parallelism,
+            parallelism,    # TODO: add parallelism at workflow level.
             continue_on_error,
             continue_on_failed,
             continue_on_num_success,
@@ -123,7 +123,7 @@ class MLWFSteps(SuperOP):
                 "task_setting": task_setting,
                 "conf_fmt": conf_fmt
             },
-            key = "prepare-MLWF",
+            key = "prepare-mlwf",
             executor = prepare_executor
         )
         self.add(prepare)
@@ -148,7 +148,7 @@ class MLWFSteps(SuperOP):
             artifacts = {
                 "task_path": prepare.outputs.artifacts["task_path"]
             },
-            key = "run-MLWF-{{item.order}}",
+            key = "run-mlwf-{{item.order}}",
             executor = run_executor,
             parallelism = parallelism,
             continue_on_error = continue_on_error,
@@ -172,7 +172,7 @@ class MLWFSteps(SuperOP):
                 "mlwf_setting": prepare.outputs.parameters["mlwf_setting"],
                 "conf_fmt": conf_fmt
             },
-            key = "collect-WFC",
+            key = "collect-wfc",
             executor = collect_executor
         )
         self.add(collect)
