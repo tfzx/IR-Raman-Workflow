@@ -14,6 +14,7 @@ if __name__ == "__main__":
     bohrium_login(load_json("../../account.json"))
     dipole_config = load_json("dipole.json")
     machine_config = load_json("../machine.json")
+    dipole_config["mlwf_setting"] = load_json(dipole_config["mlwf_setting"])
 
     base_executor = get_executor(machine_config["executors"]["base"])
     run_executor = get_executor(machine_config["executors"]["run"])
