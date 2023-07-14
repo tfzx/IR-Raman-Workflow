@@ -57,7 +57,8 @@ def read_par(parameters: Dict[str, dict]):
         read_inputs(inputs, *read_config)
 
     file_config_list = [
-        ("dp_setting", "train_inputs"),
+        ("deep_wannier", "train_inputs"),
+        ("deep_polar", "train_inputs"),
         ("mlwf_setting", ),
         ("polar_setting", ),
         ("task_setting", )
