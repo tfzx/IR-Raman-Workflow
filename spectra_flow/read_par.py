@@ -36,7 +36,7 @@ def read_par(parameters: Dict[str, dict]):
     frozen_model = uploads["frozen_model"]
     system = uploads["system"]
     other = uploads["other"]
-    inputs = {"global": global_config}
+    inputs = {}
 
     read_list = [
         ("global_config", config, ["global"]),
@@ -57,8 +57,8 @@ def read_par(parameters: Dict[str, dict]):
         read_inputs(inputs, *read_config)
 
     file_config_list = [
-        ("deep_wannier", "train_inputs"),
-        ("deep_polar", "train_inputs"),
+        ("dwann_setting", "train_inputs"),
+        ("dpolar_setting", "train_inputs"),
         ("mlwf_setting", ),
         ("polar_setting", ),
         ("task_setting", )
