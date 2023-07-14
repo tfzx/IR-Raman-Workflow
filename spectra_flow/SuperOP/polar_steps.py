@@ -95,6 +95,7 @@ class PolarSteps(SuperOP):
                 "polar_setting": polar_setting,
                 "mlwf_setting": mlwf_setting
             },
+            key = "prepare-polar",
             executor = base_exexutor
         )
         self.add(prep_polar)
@@ -137,6 +138,7 @@ class PolarSteps(SuperOP):
                 "confs": final_confs,
                 "wannier_centroid": dipole_step.outputs.artifacts["wannier_centroid"]
             },
+            key = "post-polar",
             executor = cal_executor
         )
         self.add(post_polar)
