@@ -10,8 +10,8 @@ class TestReadPar(unittest.TestCase):
         self.work_dir.mkdir()
         self.last_cwd = os.getcwd()
         os.chdir(self.work_dir)
-        self.par_f = Path("parameters.json")
-        self.par_f.write_text(json.dumps({
+        self.par_from_file = Path("parameters.json")
+        self.par_from_file.write_text(json.dumps({
             "config": {
                 "global": {
                     "type_map": ["C"]
@@ -27,6 +27,37 @@ class TestReadPar(unittest.TestCase):
                 },
                 "deep_polar": {
                     "train_inputs": "dpolar.json"
+                }
+            },
+            "uploads": {}
+        }))
+        self.par = Path("parameters2.json")
+        self.par.write_text(json.dumps({
+            "config": {
+                "global": {
+                    "type_map": ["C"]
+                },
+                "dipole": {
+                    "dft_type": "qe",
+                    "mlwf_setting": {
+                        "mlwf": "test"
+                    },
+                    "task_setting": {
+                        "task": "test"
+                    },
+                },
+                "polar": {
+                    "polar": "test"
+                },
+                "deep_wannier": {
+                    "train_inputs": {
+                        "dwann": "test"
+                    }
+                },
+                "deep_polar": {
+                    "train_inputs": {
+                        "dpolar": "test"
+                    }
                 }
             },
             "uploads": {}
@@ -59,9 +90,42 @@ class TestReadPar(unittest.TestCase):
             shutil.rmtree(self.work_dir)
         return super().tearDown()
 
+    def test_read(self):
+        inputs = read_par(load_json(self.par))
+        self.assertDictEqual(inputs, {
+            "global_config": {
+                "name": "system",
+                "calculation": "ir",
+                "dt": 0.0003,
+                "nstep": 10000,
+                "window": 1000,
+                "temperature": 300,
+                "width": 240,
+                "type_map": ["C"]
+            },
+            "polar_setting": {
+                "polar": "test"
+            },
+            "mlwf_setting": {
+                "mlwf": "test"
+            },
+            "task_setting": {
+                "task": "test"
+            },
+            "dwann_setting": {
+                "train_inputs": {
+                    "dwann": "test"
+                }
+            },
+            "dpolar_setting": {
+                "train_inputs": {
+                    "dpolar": "test"
+                }
+            }
+        })
+
     def test_read_from_file(self):
-        inputs = read_par(load_json(self.par_f))
-        print(inputs)
+        inputs = read_par(load_json(self.par_from_file))
         self.assertDictEqual(inputs, {
             "global_config": {
                 "name": "system",
