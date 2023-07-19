@@ -19,6 +19,7 @@ from dflow.python import (
 import spectra_flow
 from spectra_flow.base_workflow import SuperOP
 from spectra_flow.SuperOP.mlwf_steps import MLWFSteps
+from spectra_flow.SuperOP.post_dipole import PostDipole
 from spectra_flow.post.wannier_centroid_op import CalWC
 # from mlwf_op.prepare_input_op import Prepare
 # from mlwf_op.run_mlwf_op import RunMLWF
@@ -44,7 +45,7 @@ class DipoleSteps(SuperOP):
         return {
             "final_conf_fmt": OutputParameter()
         }, {
-            "final_confs": OutputArtifact(),
+            "labeled_confs": OutputArtifact(),
             "failed_confs": OutputArtifact(),
             "wannier_function_centers": OutputArtifact(),
             "wannier_centroid": OutputArtifact(),
@@ -116,8 +117,24 @@ class DipoleSteps(SuperOP):
             executor = cal_executor
         )
         self.add(wc_step)
-        self.outputs.artifacts["final_confs"]._from = final_confs
+
+        post_dipole = Step(
+            name = "post-dipole",
+            template = PythonOPTemplate(
+                PostDipole, # type: ignore
+                python_packages = upload_python_packages # type: ignore
+            ),
+            artifacts = {
+                "confs": final_confs,
+                "wannier_centroid": wc_step.outputs.artifacts["wannier_centroid"]
+            },
+            key = "post-dipole",
+            executor = cal_executor
+        )
+        self.add(post_dipole)
+
         self.outputs.artifacts["failed_confs"]._from = failed_confs
         self.outputs.parameters["final_conf_fmt"].value_from_parameter = final_conf_fmt
         self.outputs.artifacts["wannier_function_centers"]._from = mlwf_step.outputs.artifacts["wannier_function_centers"]
         self.outputs.artifacts["wannier_centroid"]._from = wc_step.outputs.artifacts["wannier_centroid"]
+        self.outputs.artifacts["labeled_confs"]._from = post_dipole.outputs.artifacts["labeled_confs"]

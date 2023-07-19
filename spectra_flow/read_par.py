@@ -67,6 +67,7 @@ def read_par(parameters: Dict[str, dict]):
         config_from_file(inputs, keys)
     sys_fmt_map = {
         "train_confs": "train_conf_fmt",
+        "labeled_sys": "labeled_sys_fmt",
         "sampled_system": "sys_fmt",
         "init_conf": "init_conf_fmt",
     }

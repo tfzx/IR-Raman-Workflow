@@ -29,7 +29,8 @@ class PostPolar(OP):
     @classmethod
     def get_output_sign(cls):
         return OPIOSign({
-            "polarizability": Artifact(Path)
+            "polarizability": Artifact(Path),
+            "labeled_confs": Artifact(Path)
         })
 
     @OP.exec_sign_check # type: ignore
@@ -40,7 +41,8 @@ class PostPolar(OP):
         polar_setting: Dict[str, Union[str, dict]] = op_in["polar_setting"]
         eps = polar_setting["eps_efield"]
         c_diff = polar_setting["central_diff"]
-        confs = read_conf(op_in["confs"], op_in["conf_fmt"])
+        conf_path = op_in["confs"]
+        confs = read_conf(conf_path, op_in["conf_fmt"])
         wc_dict: Dict[str, np.ndarray] = {}
         for key, p in op_in["wannier_centroid"].items():
             arr = np.loadtxt(p, dtype = float, ndmin = 2)
@@ -49,8 +51,10 @@ class PostPolar(OP):
         polar = self.cal_polar(c_diff, eps, ef_type, confs, wc_dict) # type: ignore
         polar_path = Path("polarizability.raw")
         np.savetxt(polar_path, polar)
+        np.save(conf_path / "polarizability.npy", polar)
         return OPIO({
-            "polarizability": polar_path
+            "polarizability": polar_path,
+            "labeled_confs": conf_path
         })
     
     def cal_polar(self, c_diff: bool, eps: float, ef_type: str, confs: dpdata.System, wc_dict: Dict[str, np.ndarray]) -> np.ndarray:

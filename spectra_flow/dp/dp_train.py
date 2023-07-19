@@ -12,7 +12,7 @@ from dflow.utils import (
     set_directory,
     run_command
 )
-from spectra_flow.utils import filter_confs, read_conf
+from spectra_flow.utils import filter_confs, read_labeled
 
 class DPTrain(OP, abc.ABC):
     def __init__(self) -> None:
@@ -26,10 +26,9 @@ class DPTrain(OP, abc.ABC):
     @classmethod
     def get_input_sign(cls):
         return OPIOSign({
-            "confs": Artifact(Path),
+            "labeled_sys": Artifact(Path),
             "conf_fmt": BigParameter(dict),
             "dp_setting": BigParameter(Dict),
-            "label": Artifact(Path),
         })
 
     @classmethod
@@ -44,8 +43,7 @@ class DPTrain(OP, abc.ABC):
             self,
             op_in: OPIO,
     ) -> OPIO:
-        confs = read_conf(op_in["confs"], op_in["conf_fmt"])
-        label = np.loadtxt(op_in["label"], dtype = float)
+        confs, label = read_labeled(op_in["labeled_sys"], op_in["conf_fmt"], label_name = self.full_name[self.dp_type])
         dp_setting: dict = op_in["dp_setting"]
         train_inputs: dict = dp_setting["train_inputs"]
         label = self.preprocess(label, dp_setting)

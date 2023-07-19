@@ -157,10 +157,9 @@ class RamanFlow(AdaptiveFlow):
                 "cal_dipole_python": [this.cal_dipole_python],
             },
             "train_polar": {
-                "conf_fmt": [this.train_conf_fmt],
-                "confs": [this.train_confs],
+                "conf_fmt": [this.labeled_sys_fmt, polar.final_conf_fmt],
+                "labeled_sys": [this.labeled_sys, polar.labeled_confs],
                 "dp_setting": [this.dp_setting],
-                "label": [this.train_label, polar.polarizability],
             },
             "md": {
                 "global": [this.global_config],
@@ -282,7 +281,7 @@ class RamanFlow(AdaptiveFlow):
     
     def build_predict_temp(self):
         return PredictSteps(
-            "predict_polar",
+            "predict-polar",
             "polar",
             self.executors["predict"],
             self.executors["cal"],

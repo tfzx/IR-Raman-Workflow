@@ -149,10 +149,9 @@ class IRflow(AdaptiveFlow):
                 "cal_dipole_python": [this.cal_dipole_python],
             },
             "train_wann": {
-                "conf_fmt": [this.train_conf_fmt],
-                "confs": [this.train_confs],
+                "conf_fmt": [this.labeled_sys_fmt, dipole.final_conf_fmt],
+                "labeled_sys": [this.labeled_sys, dipole.labeled_confs],
                 "dp_setting": [this.dwann_setting],
-                "label": [this.train_label, dipole.wannier_centroid],
             },
             "md": {
                 "global": [this.global_config],

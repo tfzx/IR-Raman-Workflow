@@ -103,6 +103,10 @@
                 "path": "uploads/system/train_confs",
                 "fmt": "deepmd/npy"
             },
+            "labeled_sys": {
+                "path": "uploads/system/train_confs",
+                "fmt": "deepmd/npy"
+            },
             "init_conf": {
                 "path": "uploads/system/input64.lmp",
                 "fmt": "lammps/lmp"
@@ -110,7 +114,6 @@
         },
 
         "other": {
-            "train_label": "uploads/other/dipole.raw",
             "total_dipole": "uploads/other/total_dipole.npy"
         }
     }
