@@ -105,7 +105,11 @@ def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dp
                     conf = conf_from_npz(np.load(conf_path), type_map)
     return conf
 
-def read_labeled(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]], label_name: str) -> Tuple[dpdata.System, np.ndarray]:
+def read_labeled(
+        conf_path: Union[Path, List[Path]], 
+        conf_fmt: Dict[str, Union[List[str], str]], 
+        label_name: str
+    ) -> Tuple[List[dpdata.System], List[np.ndarray]]:
     """
     Read labeled confs by the format dict `conf_fmt`. The label here means `dipole` or `polarizability`.
 
@@ -124,11 +128,17 @@ def read_labeled(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]], la
     -----
     confs, label: Tuple[dpdata.System, np.ndarray]
     """
-    confs = read_conf(conf_path, conf_fmt)
-    try:
-        label = np.loadtxt(conf_path / f"{label_name}.raw", dtype = float, ndmin = 2)
-    except:
-        label = np.load(conf_path / f"{label_name}.npy")
+    if isinstance(conf_path, Path):
+        conf_path = [conf_path]
+    confs = []
+    label = []
+    for cp in conf_path:
+        confs.append(read_conf(cp, conf_fmt))
+        try:
+            lb = np.loadtxt(cp / f"{label_name}.raw", dtype = float, ndmin = 2)
+        except:
+            lb = np.load(cp / f"{label_name}.npy")
+        label.append(lb)
     return confs, label
 
 def read_confs_list(conf_path_l: List[Path], conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
