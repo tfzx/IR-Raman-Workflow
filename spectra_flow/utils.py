@@ -242,8 +242,9 @@ def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     '''
     Translate to the home cell.
     '''
-    frac_c = to_frac(coords, cells)[..., np.newaxis]
-    return coords - np.sum(np.floor(frac_c) * cells, axis = -2)
+    _cells = cells[..., np.newaxis, :, :]
+    frac_c = to_frac(coords, _cells)[..., np.newaxis]
+    return coords - np.sum(np.floor(frac_c) * _cells, axis = -2)
 
 
 def _check_coords(coords: np.ndarray, cells: np.ndarray, eps: float) -> bool:

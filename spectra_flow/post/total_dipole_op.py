@@ -54,7 +54,7 @@ class CalTotalDipole(OP):
     
     def cal_dipole(self, confs: dpdata.System, wc: np.ndarray) -> np.ndarray:
         mask_O = confs["atom_types"] == 0
-        coords = do_pbc(confs["coords"], confs["cells"][..., np.newaxis, :, :]) # type: ignore
+        coords = do_pbc(confs["coords"], confs["cells"]) # type: ignore
         nframes = confs.get_nframes()
         wc = wc.reshape(nframes, -1, 3)
         return calculate_dipole_h2o(
