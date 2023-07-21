@@ -16,9 +16,9 @@ class TestCollect(unittest.TestCase):
         self.work_dir.mkdir()
         self.last_cwd = os.getcwd()
         os.chdir(self.work_dir)
-        self.backs = [Path(f"task.{i:06d}") for i in range(2)]
+        self.backs = [Path(f"task.000000/conf.{i:06d}/back") for i in range(2)]
         for p in self.backs:
-            p.mkdir()
+            p.mkdir(parents=True)
     
     def tearDown(self) -> None:
         os.chdir(self.last_cwd)
@@ -42,12 +42,12 @@ class TestCollect(unittest.TestCase):
         final_conf_fmt = op_out["final_conf_fmt"]
         final_confs = read_conf(final_confs, final_conf_fmt)
         self.assertEqual(final_confs.get_nframes(), 2)
-        self.assert_(np.allclose(ori_confs["coords"], final_confs["coords"])) # type: ignore
-        self.assert_(op_out["failed_confs"].exists())
+        self.assertTrue(np.allclose(ori_confs["coords"], final_confs["coords"])) # type: ignore
+        self.assertTrue(op_out["failed_confs"].exists())
         wfc1 = np.loadtxt(wfc["test1"], dtype = float).reshape(-1, 10, 3)
         wfc2 = np.loadtxt(wfc["test2"], dtype = float).reshape(-1, 9, 3)
-        self.assert_(np.allclose(wfc1, np.zeros((2, 10, 3))))
-        self.assert_(np.allclose(wfc2, np.ones((2, 9, 3))))
+        self.assertTrue(np.allclose(wfc1, np.zeros((2, 10, 3))))
+        self.assertTrue(np.allclose(wfc2, np.ones((2, 9, 3))))
 
     def test_collect_one_fail(self):
         collect_op = MockedCollectWFC(success_list = [True, False])
@@ -65,19 +65,19 @@ class TestCollect(unittest.TestCase):
         final_conf_fmt = op_out["final_conf_fmt"]
         final_confs = read_conf(final_confs, final_conf_fmt)
         self.assertEqual(final_confs.get_nframes(), 1)
-        self.assert_(np.allclose(ori_confs[0]["coords"], final_confs["coords"])) # type: ignore
+        self.assertTrue(np.allclose(ori_confs[0]["coords"], final_confs["coords"])) # type: ignore
 
         failed_confs = op_out["failed_confs"]
         self.assert_(failed_confs.exists())
         failed_confs = read_conf(failed_confs, {"fmt": "deepmd/npy"})
         self.assertEqual(failed_confs.get_nframes(), 1)
-        self.assert_(np.allclose(ori_confs[1]["coords"], failed_confs["coords"])) # type: ignore
+        self.assertTrue(np.allclose(ori_confs[1]["coords"], failed_confs["coords"])) # type: ignore
 
         wfc1 = np.loadtxt(wfc["test1"], dtype = float).reshape(-1, 10, 3)
         wfc2 = np.loadtxt(wfc["test2"], dtype = float).reshape(-1, 9, 3)
         self.assert_(np.allclose(wfc1, np.zeros((1, 10, 3))))
         self.assert_(np.allclose(wfc2, np.ones((1, 9, 3))))
-        
+
     def test_collect_all_fail(self):
         collect_op = MockedCollectWFC(success_list = [False, False])
         op_in = {
@@ -85,5 +85,44 @@ class TestCollect(unittest.TestCase):
             "confs": self.confs,
             "conf_fmt": self.conf_fmt,
             "backward": self.backs
+        }
+        self.assertRaises(AssertionError, collect_op.execute, op_in)
+
+    def test_miss_one_back(self):
+        collect_op = MockedCollectWFC(success_list = [True, True])
+        ori_confs = read_conf(self.confs, self.conf_fmt)
+        op_in = {
+            "mlwf_setting": {},
+            "confs": self.confs,
+            "conf_fmt": self.conf_fmt,
+            "backward": self.backs[0:1]
+        }
+        op_out = collect_op.execute(op_in) # type: ignore
+        wfc = op_out["wannier_function_centers"]
+
+        final_confs = op_out["final_confs"]
+        final_conf_fmt = op_out["final_conf_fmt"]
+        final_confs = read_conf(final_confs, final_conf_fmt)
+        self.assertEqual(final_confs.get_nframes(), 1)
+        self.assertTrue(np.allclose(ori_confs[0]["coords"], final_confs["coords"])) # type: ignore
+
+        failed_confs = op_out["failed_confs"]
+        self.assert_(failed_confs.exists())
+        failed_confs = read_conf(failed_confs, {"fmt": "deepmd/npy"})
+        self.assertEqual(failed_confs.get_nframes(), 1)
+        self.assertTrue(np.allclose(ori_confs[1]["coords"], failed_confs["coords"])) # type: ignore
+
+        wfc1 = np.loadtxt(wfc["test1"], dtype = float).reshape(-1, 10, 3)
+        wfc2 = np.loadtxt(wfc["test2"], dtype = float).reshape(-1, 9, 3)
+        self.assertTrue(np.allclose(wfc1, np.zeros((1, 10, 3))))
+        self.assertTrue(np.allclose(wfc2, np.ones((1, 9, 3))))
+
+    def test_miss_all_back(self):
+        collect_op = MockedCollectWFC(success_list = [False, False])
+        op_in = {
+            "mlwf_setting": {},
+            "confs": self.confs,
+            "conf_fmt": self.conf_fmt,
+            "backward": []
         }
         self.assertRaises(AssertionError, collect_op.execute, op_in)
