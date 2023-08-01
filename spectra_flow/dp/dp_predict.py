@@ -52,14 +52,16 @@ class DWannPredict(DpPredict):
     def eval(self, frozen_model, dp_setting: dict, smp_sys: dpdata.System) -> np.ndarray:
         DeepDipole = importlib.import_module("deepmd.infer").DeepDipole
         deep_wannier = DeepDipole(frozen_model)
-        predicted_wc = model_eval(deep_wannier, smp_sys)
-        if "amplif" in dp_setting:
-            predicted_wc /= dp_setting["amplif"]
+        predict_batch = dp_setting.get("predict_batch", 128)
+        predicted_wc = model_eval(deep_wannier, smp_sys, set_size = predict_batch)
+        predicted_wc /= dp_setting.get("amplif", 1.0)
         return predicted_wc
 
 class DPolarPredict(DpPredict):
     def eval(self, frozen_model, dp_setting: dict, smp_sys: dpdata.System) -> np.ndarray:
         DeepPolar = importlib.import_module("deepmd.infer").DeepPolar
         deep_polar = DeepPolar(frozen_model)
-        predicted_polar = model_eval(deep_polar, smp_sys)
+        predict_batch = dp_setting.get("predict_batch", 128)
+        predicted_polar = model_eval(deep_polar, smp_sys, set_size = predict_batch)
+        predicted_polar /= dp_setting.get("amplif", 1.0)
         return predicted_polar
