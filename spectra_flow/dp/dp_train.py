@@ -113,5 +113,8 @@ class DPolarTrain(DPTrain):
         super().__init__()
         self.dp_type = "polar"
     
-    def preprocess(self, label: np.ndarray, dp_setting: dict) -> np.ndarray:
+    def preprocess(self, label: List[np.ndarray], dp_setting: dict) -> List[np.ndarray]:
+        amplif = dp_setting.get("amplif", 1.0)
+        for i in range(len(label)):
+            label[i] *= amplif
         return label
