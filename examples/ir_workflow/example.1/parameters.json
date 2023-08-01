@@ -14,7 +14,8 @@
         },
         
         "deep_wannier": {
-            "amplif": 40.0
+            "amplif": 40.0,
+            "predict_batch": 128
         }
     },
     
