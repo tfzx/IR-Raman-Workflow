@@ -72,7 +72,7 @@ def conf_from_npz(raw_conf, type_map: Optional[List[str]] = None):
     conf_data["orig"] = np.array([0, 0, 0])
     return dpdata.System(data = conf_data)
 
-def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
+def read_conf(conf_path: Union[Path, str], conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
     """
     Read confs by the format dict `conf_fmt`.
 
@@ -225,6 +225,19 @@ def inv_cells(cells: np.ndarray):
 def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
     Transfer from the cartesian coordinate to fractional coordinate.
+
+    Parameters
+    -----
+    coords: np.ndarray,
+    in shape of (..., 3)
+
+    cells: np.ndarray,
+    in shape of (..., 3, 3)
+
+    Return
+    -----
+    fractional coords: np.ndarray,
+    in shape of (..., 3)
     """
     recip_cell = inv_cells(cells)
     return np.sum(coords[..., np.newaxis] * recip_cell, axis = -2)
@@ -232,17 +245,41 @@ def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
 def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
     Shift the coordinates (dx) to the coordinates that have the smallest absolute value.
+
+    Parameters
+    -----
+    dx: np.ndarray,
+    in shape of (..., 3)
+
+    cells: np.ndarray,
+    in shape of (..., 3, 3)
+
+    Return
+    -----
+    shifted_dx: np.ndarray,
+    in shape of (..., 3)
     """
-    frac_c = to_frac(dx, cells)[..., np.newaxis]
-    return dx - np.sum(np.round(frac_c) * cells, axis = -2)
-    # nl = np.floor(np.sum(dx[..., np.newaxis] * recip_cell, axis = -2) * 2)[..., np.newaxis]
-    # return dx - np.sum((nl + nl % 2) * cell / 2, axis = -2)
+    frac_c = to_frac(dx, cells)[..., np.newaxis]            # (..., 3, 1)
+    return dx - np.sum(np.round(frac_c) * cells, axis = -2) # (..., 3)
 
 def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     '''
     Translate to the home cell.
+
+    Parameters
+    -----
+    coords: np.ndarray,
+    in shape of (..., natom, 3)
+
+    cells: np.ndarray,
+    in shape of (..., 3    , 3)
+
+    Return
+    -----
+    translated coords: np.ndarray,
+    in shape of (..., 3)
     '''
-    _cells = cells[..., np.newaxis, :, :]
+    _cells = cells[..., np.newaxis, :, :]       # TODO
     frac_c = to_frac(coords, _cells)[..., np.newaxis]
     return coords - np.sum(np.floor(frac_c) * _cells, axis = -2)
 
