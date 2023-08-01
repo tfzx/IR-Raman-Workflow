@@ -25,14 +25,10 @@
         },
     
         "system": {
-            "train_confs": {
+            "labeled_sys": {
                 "path": "../uploads/system/train_confs",
                 "fmt": "deepmd/npy"
             }
-        },
-
-        "other": {
-            "train_label": "../uploads/other/dipole.raw"
         }
     }
 }

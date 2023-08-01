@@ -72,7 +72,7 @@ def conf_from_npz(raw_conf, type_map: Optional[List[str]] = None):
     conf_data["orig"] = np.array([0, 0, 0])
     return dpdata.System(data = conf_data)
 
-def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
+def read_conf(conf_path: Union[Path, str], conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
     """
     Read confs by the format dict `conf_fmt`.
 
@@ -104,6 +104,68 @@ def read_conf(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dp
                 except NotImplementedError:
                     conf = conf_from_npz(np.load(conf_path), type_map)
     return conf
+
+def read_labeled(
+        conf_path: Union[Path, List[Path]], 
+        conf_fmt: Dict[str, Union[List[str], str]], 
+        label_name: str
+    ) -> Tuple[List[dpdata.System], List[np.ndarray]]:
+    """
+    Read labeled confs by the format dict `conf_fmt`. The label here means `dipole` or `polarizability`.
+
+    Parameters
+    -----
+    conf_path: Path. The path to the confs.
+
+    conf_fmt: dict.
+        `{"fmt": "format, empty by default", "type_map": "None by default"}`.
+
+    label_name: str. 
+        The name of the label.
+        Label will be read from `conf_path / "{label_name}.raw"` or `conf_path / "{label_name}.npy"`.
+    
+    Return
+    -----
+    confs, label: Tuple[dpdata.System, np.ndarray]
+    """
+    if isinstance(conf_path, Path):
+        conf_path = [conf_path]
+    confs = []
+    label = []
+    for cp in conf_path:
+        confs.append(read_conf(cp, conf_fmt))
+        try:
+            lb = np.loadtxt(cp / f"{label_name}.raw", dtype = float, ndmin = 2)
+        except:
+            lb = np.load(cp / f"{label_name}.npy")
+        label.append(lb)
+    return confs, label
+
+def read_confs_list(conf_path_l: List[Path], conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.System:
+    systems = []
+    for conf_path in conf_path_l:
+        systems.append(read_conf(conf_path, conf_fmt))
+    return systems
+
+
+def read_multi_sys(conf_path: Path, conf_fmt: Dict[str, Union[List[str], str]]) -> dpdata.MultiSystems:
+    """
+    Read multiSystems by the format dict `conf_fmt`.
+
+    Parameters
+    -----
+    conf_path: Path. The path to the multiSystems.
+
+    conf_fmt: dict.
+        `{"fmt": "format, empty by default", "file_name": "'*' by default", "type_map": "None by default"}`
+    """
+    fmt: str = conf_fmt.get("fmt", "") # type: ignore
+    fmt = fmt.strip()
+    file_name = conf_fmt.get("file_name", "*")
+    type_map: List[str] = conf_fmt.get("type_map", None) # type: ignore
+    return dpdata.MultiSystems.from_dir(
+        dir_name = conf_path[0], file_name = file_name, fmt = fmt, type_map = type_map
+    )
 
 def write_to_diagonal(a: np.ndarray, diag: Union[np.ndarray, float, int], offset: int = 0, axis1: int = 0, axis2: int = 1):
     diag_slices: List[Union[slice, list]] = [slice(None) for _ in a.shape]
@@ -163,6 +225,19 @@ def inv_cells(cells: np.ndarray):
 def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
     Transfer from the cartesian coordinate to fractional coordinate.
+
+    Parameters
+    -----
+    coords: np.ndarray,
+    in shape of (..., 3)
+
+    cells: np.ndarray,
+    in shape of (..., 3, 3)
+
+    Return
+    -----
+    fractional coords: np.ndarray,
+    in shape of (..., 3)
     """
     recip_cell = inv_cells(cells)
     return np.sum(coords[..., np.newaxis] * recip_cell, axis = -2)
@@ -170,18 +245,43 @@ def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
 def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
     Shift the coordinates (dx) to the coordinates that have the smallest absolute value.
+
+    Parameters
+    -----
+    dx: np.ndarray,
+    in shape of (..., 3)
+
+    cells: np.ndarray,
+    in shape of (..., 3, 3)
+
+    Return
+    -----
+    shifted_dx: np.ndarray,
+    in shape of (..., 3)
     """
-    frac_c = to_frac(dx, cells)[..., np.newaxis]
-    return dx - np.sum(np.round(frac_c) * cells, axis = -2)
-    # nl = np.floor(np.sum(dx[..., np.newaxis] * recip_cell, axis = -2) * 2)[..., np.newaxis]
-    # return dx - np.sum((nl + nl % 2) * cell / 2, axis = -2)
+    frac_c = to_frac(dx, cells)[..., np.newaxis]            # (..., 3, 1)
+    return dx - np.sum(np.round(frac_c) * cells, axis = -2) # (..., 3)
 
 def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     '''
     Translate to the home cell.
+
+    Parameters
+    -----
+    coords: np.ndarray,
+    in shape of (..., natom, 3)
+
+    cells: np.ndarray,
+    in shape of (..., 3    , 3)
+
+    Return
+    -----
+    translated coords: np.ndarray,
+    in shape of (..., 3)
     '''
-    frac_c = to_frac(coords, cells)[..., np.newaxis]
-    return coords - np.sum(np.floor(frac_c) * cells, axis = -2)
+    _cells = cells[..., np.newaxis, :, :]       # TODO
+    frac_c = to_frac(coords, _cells)[..., np.newaxis]
+    return coords - np.sum(np.floor(frac_c) * _cells, axis = -2)
 
 
 def _check_coords(coords: np.ndarray, cells: np.ndarray, eps: float) -> bool:

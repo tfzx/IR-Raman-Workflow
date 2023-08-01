@@ -58,7 +58,8 @@ def prep_par(parameters: Dict[str, dict], run_config: dict, debug: bool = False)
         if end_i < start_i:
             raise AssertionError(f"Cannot start at {run_config['start_step']}")
         end_step = RamanFlow.main_steps[end_i]
-        run_md = run_config.get("run_md", True)
+        default_run_md = "md" in run_tree[end_step]
+        run_md = run_config.get("run_md", default_run_md)
         if "md" in run_tree[end_step] and (not run_md):
             raise AssertionError("'run_md' in run_config is False, but MD is necessary!")
         run_list = [RamanFlow.main_steps[i] for i in range(start_i, end_i + 1)]
@@ -157,10 +158,9 @@ class RamanFlow(AdaptiveFlow):
                 "cal_dipole_python": [this.cal_dipole_python],
             },
             "train_polar": {
-                "conf_fmt": [this.train_conf_fmt],
-                "confs": [this.train_confs],
-                "dp_setting": [this.dp_setting],
-                "label": [this.train_label, polar.polarizability],
+                "conf_fmt": [this.labeled_sys_fmt, polar.final_conf_fmt],
+                "labeled_sys": [this.labeled_sys, polar.labeled_confs],
+                "dp_setting": [this.dpolar_setting],
             },
             "md": {
                 "global": [this.global_config],
@@ -169,7 +169,7 @@ class RamanFlow(AdaptiveFlow):
                 "dp_model": [this.dp_model],
             },
             "predict_polar": {
-                "dp_setting": [this.dp_setting],
+                "dp_setting": [this.dpolar_setting],
                 "sampled_system": [this.sampled_system, md.sampled_system],
                 "sys_fmt": [this.sys_fmt, md.sys_fmt],
                 "frozen_model": [this.dpolar_model, train_polar.frozen_model],
@@ -282,7 +282,7 @@ class RamanFlow(AdaptiveFlow):
     
     def build_predict_temp(self):
         return PredictSteps(
-            "predict_polar",
+            "predict-polar",
             "polar",
             self.executors["predict"],
             self.executors["cal"],

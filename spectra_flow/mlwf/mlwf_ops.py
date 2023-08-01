@@ -359,7 +359,10 @@ class CollectWFC(OP, abc.ABC):
         })
     
     def collect_wfc(self, mlwf_setting: dict, conf_sys: dpdata.System, backward: List[Path]):
-        assert conf_sys.get_nframes() == len(backward)
+        assert conf_sys.get_nframes() >= len(backward), "More back files then frames!"
+        assert len(backward) > 0, "No back files!"
+        if conf_sys.get_nframes() > len(backward):
+            print("[WARNING] Missing some back files!")
         self.init_params(mlwf_setting, conf_sys, backward[0])
         total_wfc: Dict[str, np.ndarray] = {}
         failed_frames: List[int] = []
@@ -369,19 +372,28 @@ class CollectWFC(OP, abc.ABC):
                 if key not in total_wfc:
                     total_wfc[key] = np.zeros((conf_sys.get_nframes(), wfc_arr.size), dtype = float)
                 total_wfc[key][frame] = wfc_arr.flatten()
-        for frame, p in enumerate(backward):
+        for p in backward:
+            frame = int(p.parent.name.split(".")[1])
             with set_directory(p):
                 try:
                     wfc_frame = self.get_one_frame()
                     update_wfc(wfc_frame, frame)
+                    print("Collect frame {frame:06d}.")
                     success_frames.append(frame)
                 except Exception as e:
-                    print(f"[ERROR] Failed to read results of frame {frame:06d}: {e}")
+                    print(f"[WARNING] Failed to read results of frame {frame:06d}: {e}")
                     failed_frames.append(frame)
         assert len(success_frames) > 0, "All frames failed!"
         final_confs = conf_sys.sub_system(success_frames)
         for key in total_wfc:
             total_wfc[key] = total_wfc[key][success_frames]
+        nonempty_mask = np.zeros((conf_sys.get_nframes(),), dtype=bool)
+        nonempty_mask[success_frames] = True
+        nonempty_mask[failed_frames] = True
+        for frame in range(conf_sys.get_nframes()):
+            if not nonempty_mask[frame] :
+                failed_frames.append(frame)
+                print(f"[WARNING] Missing back files of frame {frame:06d}!")
         if len(failed_frames) > 0:
             failed_confs = conf_sys.sub_system(failed_frames)
         else:
