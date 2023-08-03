@@ -315,7 +315,8 @@ def filter_confs(confs: dpdata.System, tensor: Optional[np.ndarray] = None):
 def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int):
     v1 = A[:n][::-1]
     v2 = B[:n + window]
-    for ii in multiIndex(v1.shape[1:]):
+    corr = np.empty((window + 1, v1.shape[1]), dtype = float)
+    for ii in range(v1.shape[1]):
         corr[:, ii] = np.convolve(v1[:, ii], v2[:, ii], 'valid')
     corr /= n
     return corr
@@ -349,8 +350,11 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: Optional[int] =
     if n is None:
         n = min(A.shape[0], B.shape[0]) - window
     assert n <= min(A.shape[0], B.shape[0]), "The number of steps is too large!"
-    v1 = np.concatenate([A[:n][::-1], np.zeros([window, A.shape[1]], dtype = np.float32)], axis = 0)
-    v2 = B[:n + window]
+    v1 = A[:n][::-1]; v2 = B[:n + window]
+    pad_width = [(0, 0)] * A.ndim
+    pad_width[0] = (0, window)
+    v1 = np.pad(v1, pad_width, "constant", constant_values = 0)
+    # v1 = np.concatenate([A[:n][::-1], np.zeros([window, A.shape[1]], dtype = np.float32)], axis = 0)
     corr = np.fft.ifft(np.fft.fft(v1, axis = 0) * np.fft.fft(v2, axis = 0), axis = 0).real # type: ignore
     corr = corr[n - 1:n + window] / n
     return corr
@@ -362,7 +366,7 @@ def apply_gussian_filter(corr: np.ndarray, width: float):
     nmax = corr.shape[0] - 1
     return corr * np.exp(-.5 * (0.5 * width * np.arange(nmax + 1) / nmax)**2)
 
-def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
+def FILONC(DT: float, DOM: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
     """
     Calculates the Fourier cosine transform by Filon's method.
     A correlation function, C(t), in the time domain, is
@@ -380,6 +384,8 @@ def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
     C: ndarray, the correlation function.
     DT: float, time interval between points in C.
     DOM: float, frequency interval for CHAT.
+    M: Optional[int], number of intervals on the frequency axis.
+    `M = NMAX` by default.
 
     Return
     -----
@@ -405,9 +411,14 @@ def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
     NMAX = C.shape[0] - 1
     assert NMAX % 2 == 0
     TMAX = NMAX * DT
-    NU = np.arange(NMAX + 1)
+    if M is None:
+        M = NMAX
+    elif M % 2 != 0:
+        M += 1
+    NU = np.arange(M + 1)
     OMEGA = NU * DOM
     THETA = OMEGA * DT
+    # CALCULATE THE FILON PARAMETERS
     SINTH = np.sin(THETA)
     COSTH = np.cos(THETA)
     SINSQ = np.square(SINTH)
@@ -426,39 +437,93 @@ def FILONC(DT: float, DOM: float, C: np.ndarray) -> np.ndarray:
     def CAL_C0(theta: np.ndarray, args: Tuple[np.ndarray, np.ndarray]):
         a, b = args
         return np.dot(a, np.cos(theta * b))
+    # DO THE SUM OVER THE EVEN ORDINATES
+    # CE[k] = SUM_{i even} C(i) * COS ( THETA[k] * i ) - (C(0) + C(NMAX) * COS ( OMEGA[k] * TMAX ))
     CE = np.apply_along_axis(CAL_C0, axis = 1, arr = THETA[:, np.newaxis], args = (C[::2], np.arange(0, NMAX + 1, 2)))
     CE -= 0.5 * (C[0] + C[NMAX] * np.cos(OMEGA * TMAX))
+    # DO THE SUM OVER THE ODD ORDINATES
+    # CO[k] = SUM_{i odd} C(i) * COS ( THETA[k] * i )
     CO = np.apply_along_axis(CAL_C0, axis = 1, arr = THETA[:, np.newaxis], args = (C[1::2], np.arange(1, NMAX, 2)))
     CHAT = 2.0 * ( ALPHA * C[NMAX] * np.sin ( OMEGA * TMAX ) + BETA * CE + GAMMA * CO ) * DT
     return CHAT
 
-def FT(DT: float, C: np.ndarray) -> np.ndarray:
+def FT(DT: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
     """
-    The same as FILONC while DOM = 2. * np.pi / tmax.
+    The same as FILONC while `DOM = 2\pi / (M * DT)` (or `OMEGA_MAX = 2\pi / DT`).
     This is implemented by FFT.
+
+    Parameters
+    -----
+    C: ndarray, the correlation function.
+    DT: float, time interval between points in C.
+    M: Optional[int], number of intervals on the frequency axis.
+    `M = NMAX` by default.
+
+    Return
+    -----
+    freq: float, frequency. `freq = 1 / (M * DT)` 
+    CHAT: np.ndarray, the 1-d cosine transform.
     """
     NMAX = C.shape[0] - 1
     assert NMAX % 2 == 0, 'NMAX is not even!'
-    DTH = 2 * np.pi / NMAX
-    NU = np.arange(NMAX + 1)
+    if M is None:
+        M = NMAX
+    elif M % 2 != 0:
+        M += 1
+    DTH = 2 * np.pi / M
+    NU = np.arange(M + 1)
     THETA = NU * DTH
     SINTH = np.sin(THETA)
     COSTH = np.cos(THETA)
+    SINSQ = np.square(SINTH)
     COSSQ = np.square(COSTH)
     THSQ  = np.square(THETA)
     THCUB = THSQ * THETA
+    ALPHA = 1. * ( THSQ + THETA * SINTH * COSTH - 2. * SINSQ )
     BETA  = 2. * ( THETA * ( 1. + COSSQ ) - 2. * SINTH * COSTH )
     GAMMA = 4. * ( SINTH - THETA * COSTH )
+    ALPHA[0] = 0.
     BETA[0] = 2. / 3.
     GAMMA[0] = 4. / 3.
+    ALPHA[1:] /= THCUB[1:]
     BETA[1:] /= THCUB[1:]
     GAMMA[1:] /= THCUB[1:]
-    CE = np.fft.fft(C[:-1:2]).real + 0.5 * (C[NMAX] - C[0]) # type: ignore
-    CO = (np.fft.fft(C[1::2]) * np.exp(-THETA[:int(NMAX / 2)] * 1j)).real # type: ignore
-    CE = np.concatenate([CE, CE, CE[0:1]])
+    CE, CO = _FFT_OE(C, DTH, M)
+    CE -= 0.5 * (C[0] + C[NMAX] * np.cos(THETA * NMAX))
+    CHAT = 2.0 * (ALPHA * C[NMAX] * np.sin ( THETA * NMAX ) + BETA * CE + GAMMA * CO) * DT
+    freq = 1 / (M * DT)
+    return freq, CHAT
+
+def _FFT_OE(C: np.ndarray, DTH: float, M: int):
+    NMAX = C.shape[0] - 1
+    NU = np.arange(M + 1)
+    THETA = NU * DTH
+    # Even coordinates
+    CE = _range_fft(C[:-1:2], n = int(M / 2)).real # type: ignore
+    CE = np.concatenate([CE, CE, CE[0:1]]) + C[NMAX] * np.cos(THETA * NMAX)
+    # Odd coordinates
+    CO = (_range_fft(C[1::2], n = int(M / 2)) * np.exp(-THETA[:int(M / 2)] * 1j)).real # type: ignore
     CO = np.concatenate([CO, -CO, CO[0:1]])
-    CHAT = 2.0 * (BETA * CE + GAMMA * CO) * DT
-    return CHAT
+    return CE, CO
+
+def _range_fft(a: np.ndarray, n: Optional[int] = None, axis: int = -1):
+    """
+    Compute `a_hat[..., l, ...] = \sum_{k=1}^{a.shape[axis]} a[..., k, ...]e^{-(2kl\pi/n)}`
+    """
+    axis %= a.ndim
+    l = a.shape[axis]
+    if n is None:
+        n = l
+    if n >= l:
+        return np.fft.fft(a, n, axis)
+    num_n = int(l / n)
+    l0 = n * num_n
+    new_shape = list(a.shape)
+    new_shape[axis] = n
+    new_shape.insert(axis, num_n)
+    a_main = np.sum(a.take(range(l0), axis).reshape(new_shape), axis)
+    a_tail = a.take(range(l0, l), axis)
+    return np.fft.fft(a_main, n, axis) + np.fft.fft(a_tail, n, axis)
 
 def numerical_diff(y: np.ndarray, h: float):
     g = (y[2:] - y[:-2]) / (2 * h) # type: ignore
