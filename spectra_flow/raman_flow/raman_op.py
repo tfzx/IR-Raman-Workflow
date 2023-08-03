@@ -38,12 +38,15 @@ class CalRaman(OP):
         width = global_config["width"]
         temperature = global_config["temperature"]
         window = global_config["window"]
+        M = global_config.get("num_omega", None)
+        if M is not None:
+            M = max(M, window)
 
-        total_polar = np.load(op_in["total_polar"])
+        total_polar = np.load(op_in["total_polar"]).reshape(-1, 3, 3)
         
         corr_iso, corr_aniso = calculate_corr_polar(total_polar, window)
-        raman_iso = calculate_raman(corr_iso, width = width, dt_ps = dt, temperature = temperature)
-        raman_aniso = calculate_raman(corr_aniso, width = width, dt_ps = dt, temperature = temperature)
+        raman_iso = calculate_raman(corr_iso, width = width, dt_ps = dt, temperature = temperature, M = M)
+        raman_aniso = calculate_raman(corr_aniso, width = width, dt_ps = dt, temperature = temperature, M = M)
 
         raman_iso_path = Path("raman_iso.raw")
         raman_aniso_path = Path("raman_aniso.raw")

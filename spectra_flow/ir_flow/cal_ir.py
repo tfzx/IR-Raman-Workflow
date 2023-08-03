@@ -1,3 +1,4 @@
+from typing import Optional
 import numpy as np
 from spectra_flow.utils import (
     calculate_corr,
@@ -11,26 +12,23 @@ def calculate_corr_vdipole(dipole: np.ndarray, dt_ps: float, window: int):
     corr = np.sum(calculate_corr(v_dipole, v_dipole, window), axis = -1)
     return corr
 
-def calculate_ir(corr: np.ndarray, width: float, dt_ps: float, temperature: float):
+def calculate_ir(corr: np.ndarray, width: float, dt_ps: float, temperature: float, M: Optional[int] = None):
     nmax = corr.shape[0] - 1
     if nmax % 2 != 0:
         nmax -= 1
         corr = corr[:-1]
     tmax = nmax * dt_ps
-    # dom = 2. * np.pi / tmax
-    print('nmax =', nmax)
-    print('dt   =', dt_ps)
-    print('tmax =', tmax)
-    print("width = ", width)
-    width = width * tmax / 100.0 * 3.0
+    print('nmax      =', nmax)
+    print('dt   (ps) =', dt_ps)
+    print('tmax (ps) =', tmax)
+    print("width     = ", width)
+    width = width * tmax / 100.0 * 3
     C = apply_gussian_filter(corr, width)
-    cc = 2.99792458e8;      # m/s
-    CHAT = FT(dt_ps, C)
-    CHAT = change_unit(CHAT, temperature)
-    d_omega = 1e10 / (tmax * cc)
+    freq_ps, CHAT = FT(dt_ps, C, M)
+    d_omega, CHAT = _change_unit(freq_ps, CHAT, temperature)
     return np.stack([np.arange(CHAT.shape[0]) * d_omega, CHAT], axis = 1)
 
-def change_unit(CHAT: np.ndarray, temperature: float):
+def _change_unit(freq_ps, CHAT: np.ndarray, temperature: float):
     a0 = 0.52917721067e-10  # m
     cc = 2.99792458e8;      # m/s
     kB = 1.38064852*1.0e-23 # J/K
@@ -48,4 +46,6 @@ def change_unit(CHAT: np.ndarray, temperature: float):
     unit_all = beta / (3.0 * cc * a0 ** 3) / (2 * epsilon0) * unit2
     unit_all = unit_all * 1.0e12 * 1.0e-2; # ps to s, m-1 to cm-1
     CHAT *= unit_all
-    return CHAT
+    d_omega = freq_ps / cc     # Wavenumber
+    d_omega *= 1e10         # cm^-1
+    return d_omega, CHAT

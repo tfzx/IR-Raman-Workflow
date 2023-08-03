@@ -37,11 +37,14 @@ class CalIR(OP):
         width = global_config["width"]
         temperature = global_config["temperature"]
         window = global_config["window"]
+        M = global_config.get("num_omega", None)
+        if M is not None:
+            M = max(M, window)
 
-        total_dipole = np.load(op_in["total_dipole"])
+        total_dipole = np.load(op_in["total_dipole"]).reshape(-1, 3)
         
         corr = calculate_corr_vdipole(total_dipole, dt_ps = dt, window = window)
-        ir = calculate_ir(corr, width = width, dt_ps = dt, temperature = temperature)
+        ir = calculate_ir(corr, width = width, dt_ps = dt, temperature = temperature, M = M)
 
         ir_path = Path("ir.raw")
         np.savetxt(ir_path, ir, fmt = "%15.8f")
