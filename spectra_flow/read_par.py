@@ -51,6 +51,7 @@ def read_par(parameters: Dict[str, dict]):
         ("pseudo", other, ["pseudo"]),
         ("train_label", other, ["train_label"]),
         ("total_dipole", other, ["total_dipole"]),
+        ("total_polar", other, ["total_polar"]),
         ("cal_dipole_python", other, ["cal_dipole_python"]),
     ]
     for read_config in read_list:
