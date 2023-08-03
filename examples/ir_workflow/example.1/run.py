@@ -13,7 +13,7 @@ if __name__ == "__main__":
 
     # 4 steps: dipole, train, predict, cal_ir
     run_config = {
-        "start_step": "predict",
+        "start_step": "predict_dipole",
         "end_step": "cal_ir",
         "run_md": True
     }
