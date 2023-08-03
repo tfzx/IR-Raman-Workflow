@@ -1,0 +1,58 @@
+{
+    "executors":{
+        "base": {
+            "type": "bohrium",
+            "params": {
+                "image_name": "registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                "machine_type" : "c8_m16_cpu",
+                "job_type": "container",
+                "platform": "ali"
+            }
+        },
+        "run": {
+            "type": "bohrium",
+            "params": {
+                "image_name": "registry.dp.tech/dptech/prod-13467/qe:7.0-wannier-libxc",
+                "machine_type": "c64_m128_cpu",
+                "job_type": "container",
+                "platform": "ali"
+            }
+        },
+        "cal": {
+            "type": "bohrium",
+            "params": {
+                "image_name": "registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                "machine_type": "c16_m32_cpu",
+                "job_type": "container",
+                "platform": "ali"
+            }
+        },
+        "train": {
+            "type": "bohrium",
+            "params": {
+                "image_name": "registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                "machine_type": "c4_m15_1 * NVIDIA T4",
+                "job_type": "container",
+                "platform": "ali"
+            }
+        },
+        "predict": {
+            "type": "bohrium",
+            "params": {
+                "image_name": "registry.dp.tech/dptech/deepmd-kit:2.1.5-cuda11.6",
+                "machine_type": "c4_m15_1 * NVIDIA T4",
+                "job_type": "container",
+                "platform": "ali"
+            }
+        },
+        "deepmd_lammps": {
+            "type": "bohrium",
+            "params": {
+                "image_name": "registry.dp.tech/dptech/lammps:23Jun2022-dp2.1.5",
+                "machine_type": "c4_m15_1 * NVIDIA T4",
+                "job_type": "container",
+                "platform": "ali"
+            }
+        }
+    }
+}

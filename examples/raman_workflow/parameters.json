@@ -1,0 +1,72 @@
+{
+    "config": {
+        "global": {
+            "name": "water",
+            "calculation": "raman",
+            "type_map": ["O", "H"],
+            "mass_map": [15.9994, 2.0141],
+            "read_buffer": 50000,
+            "dt": 0.0003,
+            "nstep": 100000,
+            "window": 10000,
+            "temperature": 300,
+            "width": 240
+        },
+        
+        "polar": {
+            "ef_type": "enthalpy",
+            "central_diff": false,
+            "eps_efield": 0.001
+        },
+
+        "dipole": {
+            "dft_type": "qe",
+            "mlwf_setting": "mlwf.json",
+            "task_setting": {
+                "group_size": 1,
+                "commands": {
+                    "pw": "mpirun -n 64 pw.x",
+                    "pw2wannier": "mpirun -n 64 pw2wannier90.x",
+                    "wannier90": "wannier90.x",
+                    "wannier90_pp": "wannier90.x"
+                },
+                "backward_list": [
+                    "*.xyz",
+                    "*.wout"
+                ],
+                "backward_dir_name": "back"
+            }
+        },
+
+        "deep_polar": {
+            "train_inputs": "train.json",
+            "predict_batch": 128
+        }
+    },
+    
+    "uploads": {
+        "frozen_model": {
+            "deep_potential": "uploads/frozen_model/potential.pb",
+            "deep_polar": "uploads/frozen_model/polar.pb"
+        },
+    
+        "system": {
+            "train_confs": {
+                "path": "uploads/system/train_confs",
+                "fmt": "deepmd/npy"
+            },
+            "labeled_sys": {
+                "path": "uploads/system/train_confs",
+                "fmt": "deepmd/npy"
+            },
+            "init_conf": {
+                "path": "uploads/system/input64.lmp",
+                "fmt": "lammps/lmp"
+            }
+        },
+
+        "other": {
+            "total_polar": "uploads/other/total_polar.npy"
+        }
+    }
+}

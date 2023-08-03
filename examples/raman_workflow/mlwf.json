@@ -1,0 +1,61 @@
+{
+    "name": "water",
+    "dft_params": {
+        "cal_type": "scf",
+        "qe_params": {
+            "control": {
+                "title": "water",
+                "nstep": 20000
+            },
+            "system": {
+                "ecutwfc": 110,
+                "input_dft": "SCAN",
+                "ibrav": 0
+            },
+            "electrons": {
+                "conv_thr": 1e-08,
+                "mixing_beta": 0.20
+            },
+            "ions": null,
+            "cell": null
+        },
+        "pw2wan_params": {
+            "inputpp": {
+                "spin_component": null,
+                "write_mmn": true,
+                "write_amn": true,
+                "write_unk": false
+            }
+        },
+        "pseudo_dir": "pseudo",
+        "atomic_species": {
+            "O": {
+                "mass": 16.0,
+                "pseudo": "O.SCAN.UPF"
+            },
+            "H": {
+                "mass": 1.0,
+                "pseudo": "H.SCAN.UPF"
+            }
+        },
+        "k_grid": [
+            1,
+            1,
+            1
+        ]
+    },
+    "wannier90_params": {
+        "wan_params": {
+            "num_iter": 1000,
+            "kmesh_tol": 0.00000001,
+            "num_wann": 256,
+            "write_xyz": true,
+            "translate_home_cell": true,
+            "guiding_centres": true,
+            "mp_grid": "1, 1, 1"
+        },
+        "projections": {
+            "O": "sp3"
+        }
+    }
+}
