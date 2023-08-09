@@ -130,6 +130,8 @@ def read_labeled(
     """
     if isinstance(conf_path, Path):
         conf_path = [conf_path]
+    elif isinstance(conf_path, str):
+        conf_path = [Path(conf_path)]
     confs = []
     label = []
     for cp in conf_path:
@@ -322,53 +324,58 @@ def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: int):
     return corr
 '''
 
-def calculate_corr(A: np.ndarray, B: np.ndarray, window: int, n: Optional[int] = None):
+def calculate_corr(A: np.ndarray, B: np.ndarray, NMAX: int, window: Optional[int] = None):
     """
-    Calculate the correlation function: <A(0)*B(t)>. Here, A(t) and B(t) is a d-dimensional vector, 
-    and A(t) * B(t) is the element-wise production, and the result is also a d-dimensional vector.
+    Calculate the correlation function: `corr(t) = <A(0) * B(t)>`. 
+    Here, `A(t)` and `B(t)` are arrays of the same dimensions, 
+    and `A(t) * B(t)` is the element-wise multiplication. 
+    The esenmble average `< >` is estimated by moving average.
 
     Parameters
     -----
-    A, B: np.ndarray, in shape of (num_t, d).
-        The first dimension refers to the time, and the second dimension refers to the dimension of the vector.
+    A, B: np.ndarray, in shape of (num_t, ...).
+        The first dimension refers to the time steps, and its size can be different.
+        The remaining dimensions (if present) must be the same.
     
-    window: int.
-        the width of window to approximate the ensemble average.
-        <A(0)*B(t)> = 1 / window * \sum_{i = 0}^{window - 1} A(i)*B(t + i)
+    NMAX: int.
+        Maximal time steps. Calculate `corr(t)` with `0 <= t <= NMAX`.
+    
+    window: int, optional.
+        The width of window to do the moving average. 
 
-    n: int, Optional.
-        Maximal time steps.
-    
+        `<A(0) * B(t)> = 1 / window * \sum_{i = 0}^{window - 1} A(i) * B(t + i)`. 
+
     Return
     -----
-    corr: np.ndarray, in shape of (n, d).
-        corr(t) = <A(0)*B(t)>
+    corr: np.ndarray, in shape of (NMAX + 1, ...).
+        `corr(t) = <A(0) * B(t)>`
     """
     if A.ndim == 1 or B.ndim == 1:
         A = A.reshape(-1, 1)
         B = B.reshape(-1, 1)
-    if n is None:
-        n = min(A.shape[0], B.shape[0]) - window
-    assert n <= min(A.shape[0], B.shape[0]), "The number of steps is too large!"
-    v1 = A[:n][::-1]; v2 = B[:n + window]
+    if window is None:
+        window = min(A.shape[0], B.shape[0] - NMAX)
+    # Prepare for convolution
+    v1 = A[:window][::-1]; v2 = B[:window + NMAX]
     pad_width = [(0, 0)] * A.ndim
-    pad_width[0] = (0, window)
+    pad_width[0] = (0, NMAX)
     v1 = np.pad(v1, pad_width, "constant", constant_values = 0)
-    # v1 = np.concatenate([A[:n][::-1], np.zeros([window, A.shape[1]], dtype = np.float32)], axis = 0)
+    # Convolve by FFT
     corr = np.fft.ifft(np.fft.fft(v1, axis = 0) * np.fft.fft(v2, axis = 0), axis = 0).real # type: ignore
-    corr = corr[n - 1:n + window] / n
+    # Moving average
+    corr = corr[window - 1:window + NMAX] / window
     return corr
 
 def apply_gussian_filter(corr: np.ndarray, width: float):
     """
-    Apply gaussian filter. Parameter width means the smoothing width.
+    Apply gaussian filter. Parameter `width` means the smoothing width.
     """
     nmax = corr.shape[0] - 1
     return corr * np.exp(-.5 * (0.5 * width * np.arange(nmax + 1) / nmax)**2)
 
 def FILONC(DT: float, DOM: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
     """
-    Calculates the Fourier cosine transform by Filon's method.
+    Calculate the Fourier cosine transform by Filon's method.
     A correlation function, C(t), in the time domain, is
     transformed to a spectrum CHAT(OMEGA) in the frequency domain.
 
