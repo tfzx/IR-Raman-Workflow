@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union, IO
+from typing import Dict, List, Mapping, Optional, Tuple, Union, IO
 from tempfile import TemporaryFile
 import numpy as np
 from copy import deepcopy
@@ -63,7 +63,7 @@ def bohrium_login(account_config: Optional[dict] = None, debug: bool = False):
     s3_config["repo_key"] = "oss-bohrium"
     s3_config["storage_client"] = TiefblueClient()
 
-def conf_from_npz(raw_conf, type_map: Optional[List[str]] = None):
+def conf_from_npz(raw_conf: Mapping[str, np.ndarray], type_map: Optional[List[str]] = None):
     conf_data = dict(raw_conf)
     types = conf_data["atom_types"]
     ntyp = np.max(types) + 1
@@ -180,17 +180,112 @@ def write_to_diagonal(a: np.ndarray, diag: Union[np.ndarray, float, int], offset
     diag_slices[axis2] = list(range(start_idx[1], start_idx[1] + diag_len))
     a[tuple(diag_slices)] = diag
 
-def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.ndarray, k: int):
+def get_distance(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.ndarray, 
+                 remove_diag: bool = False, offset: int = 0):
     """
-        For each point in coords_A, choose the k-nearest points (in the box) among coords_B, and return the index.
+        Calculate the distances between coords_A and coords_B.
         The distance is calculated in the sense of PBC.
 
         Parameters
         -------------
-            coords_A (..., num_A, d): the coordinates of the central points. The size of the last axis is the dimension.
-            coords_B (..., num_B, d): the coordinates of the points to be selected. 
+            coords_A (..., num_A, 3): the coordinates of the central points. The size of the last axis is the dimension.
+            coords_B (..., num_B, 3): the coordinates of the points to be selected. 
+            If B is None, A will be compared with itself.
+            cells    (..., 3, 3): the PBC cells.
+            remove_diag, bool: whether to fill the diagonal with np.inf.
+
+        Return
+        -------------
+            distance (..., num_A, num_B): the matrix of distances.
+    """
+    if coords_B is None:
+        coords_B = coords_A
+    distance = np.linalg.norm(
+        box_shift(
+            coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :],  # type: ignore
+            cells[..., np.newaxis, np.newaxis, :, :]
+        ), 
+        ord = 2, axis = -1
+    )
+    num_A, num_B = distance.shape[-2:]
+    if remove_diag:
+        write_to_diagonal(distance, np.inf, offset = offset, axis1 = -2, axis2 = -1)
+    return distance
+
+def k_nearest_safe(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.ndarray, 
+                   k: int, batch_size: int = -1):
+    """
+    For each atom in coords_A, choose the k-nearest atoms (in the cell) among coords_B, and return their indices.
+    The distance is calculated in the sense of PBC.
+
+    Parameters
+    -------------
+    coords_A (..., num_A, 3): 
+    the coordinates of the central points. The size of the last axis is the dimension.
+
+    coords_B (..., num_B, 3): 
+    the coordinates of the points to be selected. 
+    If B is None, A will be compared with itself, where the diagonal will be removed.
+
+    cells (..., 3, 3): 
+    the PBC box. cells[..., :, i] is the i-th axis of the cell.
+
+    k: int, the number of the points selected from coords_B.
+
+    batch_size: int, the batch size of atoms in coords_B at each time. 
+    The required memory size is (..., num_A, k + batch_size).
+    If batch_size <= 0, it will use the largest batch_size, 
+    which means the required memory size is (..., num_A, num_B).
+
+    Return
+    -------------
+    indices (..., num_A, k): the indices of the k-nearest points in coords_B.
+
+    distances (..., num_A, k): the distances of the k-nearest points in coords_B.
+    """
+    self_comp = False
+    if coords_B is None:
+        coords_B = coords_A
+        self_comp = True
+    d = coords_B.shape[-2]
+    k = min(d, k)
+    batch_size = min(d - k, batch_size)
+    if batch_size <= 0:
+        distance = get_distance(coords_A, coords_B, cells, remove_diag = self_comp)
+        k_index = np.argsort(distance, axis = -1)[..., :k]
+        k_distance = np.take_along_axis(distance, k_index, axis = -1)
+    else:
+        _shape = list(coords_A.shape)
+        _shape[-1] = k + batch_size
+        k_index = np.empty(_shape, dtype = int)
+        k_distance = np.empty(_shape, dtype = coords_B.dtype)
+        k_index[..., :k] = np.arange(k)
+        k_distance[..., :k] = get_distance(
+            coords_A, coords_B[..., :k, :], cells, remove_diag = self_comp, offset = 0
+        )
+        for i in range(k, d, batch_size):
+            end_i = min(d, i + batch_size)
+            sz = end_i - i
+            k_index[..., k:k + sz] = np.arange(i, end_i)
+            k_distance[..., k:k + sz] = get_distance(
+                coords_A, coords_B[..., i:end_i, :], cells, remove_diag = self_comp, offset = i
+            )
+            sort_idx = np.argsort(k_distance, axis = -1)
+            k_index = np.take_along_axis(k_index, sort_idx, axis = -1)
+            k_distance = np.take_along_axis(k_distance, sort_idx, axis = -1)
+    return k_index[..., :k], k_distance[..., :k]
+
+def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.ndarray, k: int):
+    """
+        For each atom in coords_A, choose the k-nearest atoms (in the box) among coords_B, and return their index.
+        The distance is calculated in the sense of PBC.
+
+        Parameters
+        -------------
+            coords_A (..., num_A, 3): the coordinates of the central points. The size of the last axis is the dimension.
+            coords_B (..., num_B, 3): the coordinates of the points to be selected. 
             If B is None, A will be compared with itself, where the diagonal will be removed.
-            box      (..., d): the PBC box. box[..., i] is the length of period along x_i.
+            cells    (..., 3, 3): the PBC box. box[..., i] is the length of period along x_i.
             k: int, the number of the points selected from coords_B.
 
         Return
@@ -201,16 +296,19 @@ def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.nd
     if coords_B is None:
         coords_B = coords_A
         self_comp = True
-    distance = np.linalg.norm(
-        box_shift(
-            coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :],  # type: ignore
-            cells[..., np.newaxis, np.newaxis, :, :]
-        ), 
-        ord = 2, axis = -1
-    )
-    if self_comp:
-        write_to_diagonal(distance, np.inf, offset = 0, axis1 = -2, axis2 = -1)
-    return np.argsort(distance, axis = -1)[..., :k]
+    # distance = np.linalg.norm(
+    #     box_shift(
+    #         coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :],  # type: ignore
+    #         cells[..., np.newaxis, np.newaxis, :, :]
+    #     ), 
+    #     ord = 2, axis = -1
+    # )
+    # if self_comp:
+    #     write_to_diagonal(distance, np.inf, offset = 0, axis1 = -2, axis2 = -1)
+    distance = get_distance(coords_A, coords_B, cells, remove_diag = self_comp)
+    k_index = np.argsort(distance, axis = -1)[..., :k]
+    k_distance = np.take_along_axis(distance, k_index, axis = -1)
+    return k_index, k_distance
 
 def inv_cells(cells: np.ndarray):
     """
@@ -274,7 +372,7 @@ def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     in shape of (..., natom, 3)
 
     cells: np.ndarray,
-    in shape of (..., 3    , 3)
+    in shape of (..., 3, 3)
 
     Return
     -----
@@ -372,6 +470,21 @@ def apply_gussian_filter(corr: np.ndarray, width: float):
     """
     nmax = corr.shape[0] - 1
     return corr * np.exp(-.5 * (0.5 * width * np.arange(nmax + 1) / nmax)**2)
+
+def apply_lorenz_filter(corr: np.ndarray, width: float, dt):
+    """
+    Apply Cauchy-Lorenz filter. Parameter `width` means the smoothing width.
+    """
+    nmax = corr.shape[0] - 1
+    b = width * 2.99792458e-3
+    M = int(1 / (dt * 0.01 * 2)) * 2
+    M = max(M, nmax)
+    dx = 1 / (M * dt)
+    NX = int(50 * np.sqrt(b) / dx / 2) * 2
+    x = np.arange(NX + 1) * dx
+    p = b / (b**2 + x**2)
+    _, ph = FT(dx, p, M)
+    return corr * ph[:nmax + 1]
 
 def FILONC(DT: float, DOM: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
     """

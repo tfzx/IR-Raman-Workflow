@@ -53,7 +53,7 @@ def cal_wc_h2o(wfc: np.ndarray, coords_O: np.ndarray, cells: np.ndarray) -> np.n
         -------------
             wannier centroids (..., num_O, 3): the wannier centroid relative to each O atoms.
     """
-    idx = k_nearest(coords_O, wfc, cells, k = 4)
+    idx, _ = k_nearest(coords_O, wfc, cells, k = 4)
     wfc = np.take_along_axis(wfc[..., np.newaxis, :, :], idx[..., np.newaxis], axis = -2)
     return np.mean(box_shift(wfc - coords_O[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :]), axis = -2) # type: ignore
 
