@@ -1,6 +1,6 @@
 from typing import Optional, Sequence
 import numpy as np
-from encode_env import encode_by_env2, decode_by_env
+from encode_env import encode_by_env, decode_by_env
 
 def calc_adj_mat1(structure: np.ndarray, pair_order: np.ndarray):
     _sturc = structure[0]
@@ -35,16 +35,18 @@ def calc_adj_mat2(structure: np.ndarray, charges: np.ndarray):
     assert np.allclose(np.sum(adj_mat, axis = -1), charges)
     return adj_mat
 
-def get_residual_charge(atom_types, valence_map: Sequence[float], wc_charge: np.ndarray, ions_charge: Optional[np.ndarray] = None):
+def get_residual_charge(atom_types: Sequence[int], valence_map: Sequence[float], 
+                        wc_charge: np.ndarray, ions_charge: Optional[np.ndarray] = None):
     if ions_charge is None:
         ions_charge = 0
+    atom_types = np.array(atom_types)
     valence_charge = np.zeros_like(atom_types, dtype = float)
     for i in range(len(valence_map)):
         valence_charge[atom_types == i] = valence_map[i]
     return valence_charge - ions_charge - wc_charge
 
 def dump_charge_map(atom_types, residual_charge, structure):
-    return encode_by_env2(atom_types, structure, residual_charge)
+    return encode_by_env(atom_types, structure, residual_charge)
 
 def infer_charge(atom_types, charge_map, structure):
     return decode_by_env(atom_types, structure, charge_map)
