@@ -202,12 +202,11 @@ def get_distance(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np
         coords_B = coords_A
     distance = np.linalg.norm(
         box_shift(
-            coords_A[..., np.newaxis, :] - coords_B[..., np.newaxis, :, :],  # type: ignore
-            cells[..., np.newaxis, np.newaxis, :, :]
+            coords_A[..., None, :] - coords_B[..., None, :, :],  # type: ignore
+            cells
         ), 
         ord = 2, axis = -1
     )
-    num_A, num_B = distance.shape[-2:]
     if remove_diag:
         write_to_diagonal(distance, np.inf, offset = offset, axis1 = -2, axis2 = -1)
     return distance
@@ -252,7 +251,7 @@ def k_nearest_safe(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: 
     batch_size = min(d - k, batch_size)
     if batch_size <= 0:
         distance = get_distance(coords_A, coords_B, cells, remove_diag = self_comp)
-        k_index = np.argsort(distance, axis = -1)[..., :k]
+        k_index = np.argpartition(distance, k, axis = -1)[..., :k]
         k_distance = np.take_along_axis(distance, k_index, axis = -1)
     else:
         _shape = list(coords_A.shape)
@@ -270,10 +269,13 @@ def k_nearest_safe(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: 
             k_distance[..., k:k + sz] = get_distance(
                 coords_A, coords_B[..., i:end_i, :], cells, remove_diag = self_comp, offset = i
             )
-            sort_idx = np.argsort(k_distance, axis = -1)
-            k_index = np.take_along_axis(k_index, sort_idx, axis = -1)
-            k_distance = np.take_along_axis(k_distance, sort_idx, axis = -1)
-    return k_index[..., :k], k_distance[..., :k]
+            partition_idx = np.argpartition(k_distance, k, axis = -1)
+            k_index = np.take_along_axis(k_index, partition_idx, axis = -1)
+            k_distance = np.take_along_axis(k_distance, partition_idx, axis = -1)
+    sort_idx = np.argsort(k_distance[..., :k], axis = -1)
+    k_index = np.take_along_axis(k_index[..., :k], sort_idx, axis = -1)
+    k_distance = np.take_along_axis(k_distance[..., :k], sort_idx, axis = -1)
+    return k_index, k_distance
 
 def k_nearest(coords_A: np.ndarray, coords_B: Optional[np.ndarray], cells: np.ndarray, k: int):
     """
@@ -314,13 +316,22 @@ def inv_cells(cells: np.ndarray):
     """
     Reciprocal cells.
     """
-    inv_cells = np.zeros_like(cells)
-    inv_cells[..., :, 0] = np.cross(cells[..., 1, :], cells[..., 2, :])
-    inv_cells[..., :, 1] = np.cross(cells[..., 2, :], cells[..., 0, :])
-    inv_cells[..., :, 2] = np.cross(cells[..., 0, :], cells[..., 1, :])
-    vol = np.sum(inv_cells[..., :, 0] * cells[..., 0, :], axis = -1)
-    inv_cells /= vol[..., np.newaxis, np.newaxis]
+    inv_cells = np.linalg.inv(cells)
+    # inv_cells = np.zeros_like(cells)
+    # inv_cells[..., :, 0] = np.cross(cells[..., 1, :], cells[..., 2, :])
+    # inv_cells[..., :, 1] = np.cross(cells[..., 2, :], cells[..., 0, :])
+    # inv_cells[..., :, 2] = np.cross(cells[..., 0, :], cells[..., 1, :])
+    # vol = np.sum(inv_cells[..., :, 0] * cells[..., 0, :], axis = -1)
+    # inv_cells /= vol[..., np.newaxis, np.newaxis]
     return inv_cells
+
+def _coords_cells_mul(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
+    if coords.ndim >= cells.ndim:
+        d0 = coords.ndim - cells.ndim + 1
+        _shape = coords.shape
+        return np.matmul(coords.reshape(_shape[:-d0-1] + (-1, 3)), cells).reshape(_shape)
+    else:
+        return np.matmul(coords[..., None, :], cells).squeeze(-2)
 
 def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
@@ -340,7 +351,7 @@ def to_frac(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     in shape of (..., 3)
     """
     recip_cell = inv_cells(cells)
-    return np.sum(coords[..., np.newaxis] * recip_cell, axis = -2)
+    return _coords_cells_mul(coords, recip_cell)
 
 def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
     """
@@ -359,8 +370,9 @@ def box_shift(dx: np.ndarray, cells: np.ndarray) -> np.ndarray:
     shifted_dx: np.ndarray,
     in shape of (..., 3)
     """
-    frac_c = to_frac(dx, cells)[..., np.newaxis]            # (..., 3, 1)
-    return dx - np.sum(np.round(frac_c) * cells, axis = -2) # (..., 3)
+    # frac_c = to_frac(dx, cells)[..., np.newaxis]            # (..., 3, 1)
+    return dx - _coords_cells_mul(np.round(to_frac(dx, cells)), cells)
+    # return dx - np.sum(np.round(frac_c) * cells, axis = -2) # (..., 3)
 
 def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     '''
@@ -379,13 +391,13 @@ def do_pbc(coords: np.ndarray, cells: np.ndarray) -> np.ndarray:
     translated coords: np.ndarray,
     in shape of (..., 3)
     '''
-    _cells = cells[..., np.newaxis, :, :]       # TODO
-    frac_c = to_frac(coords, _cells)[..., np.newaxis]
-    return coords - np.sum(np.floor(frac_c) * _cells, axis = -2)
+    # _cells = cells[..., np.newaxis, :, :]       # TODO
+    # frac_c = to_frac(coords, _cells)[..., np.newaxis]
+    return coords - _coords_cells_mul(np.floor(to_frac(coords, cells)), cells)
 
 
 def _check_coords(coords: np.ndarray, cells: np.ndarray, eps: float) -> bool:
-    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], cells[..., np.newaxis, np.newaxis, :, :]) # type: ignore # type: ignore
+    delta = box_shift(coords[..., np.newaxis, :, :] - coords[..., np.newaxis, :], cells) # type: ignore # type: ignore
     mask = np.linalg.norm(delta, 2, axis = -1) < eps
     np.fill_diagonal(mask, False)
     return not mask.any()
