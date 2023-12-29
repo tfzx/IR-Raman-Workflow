@@ -17,26 +17,26 @@ def kmesh(nx: int, ny: int, nz: int):
 def complete_by_default(params: dict, params_default: dict, if_copy: bool = False):
     if if_copy:
         params = deepcopy(params)
-    for key in params_default:
-        if isinstance(params_default[key], dict):
+    for key, def_val in params_default.items():
+        if isinstance(def_val, dict):
             if key not in params:
                 params[key] = {}
             if isinstance(params[key], dict):
-                complete_by_default(params[key], params_default[key], if_copy = False)
+                complete_by_default(params[key], def_val, if_copy = False)
         else:
             if key not in params:
-                params[key] = params_default[key]
+                params[key] = def_val
     return params
 
 def recurcive_update(dict1: dict, dict2: dict):
-    for key in dict2:
-        if isinstance(dict2[key], dict):
+    for key, val2 in dict2.items():
+        if isinstance(val2, dict):
             if key not in dict1:
                 dict1[key] = {}
             if isinstance(dict1[key], dict):
-                recurcive_update(dict1[key], dict2[key])
+                recurcive_update(dict1[key], val2)
         else:
-            dict1[key] = dict2[key]
+            dict1[key] = val2
 
 def load_json(path: Union[str, Path]):
     with open(path, "r") as f:
@@ -64,11 +64,15 @@ def bohrium_login(account_config: Optional[dict] = None, debug: bool = False):
     s3_config["storage_client"] = TiefblueClient()
 
 def conf_from_npz(raw_conf: Mapping[str, np.ndarray], type_map: Optional[List[str]] = None):
-    conf_data = dict(raw_conf)
+    conf_data = {"coords": raw_conf["coords"], "cells": raw_conf["cells"], "atom_types": raw_conf["atom_types"]}
     types = conf_data["atom_types"]
+    try:
+        type_map = raw_conf["type_map"].tolist()
+    except:
+        pass
     ntyp = np.max(types) + 1
     conf_data["atom_numbs"] = [int(np.sum(types == i)) for i in range(ntyp)]
-    conf_data["atom_names"] = type_map if type_map is not None else [str(i) for i in range(ntyp)]
+    conf_data["atom_names"] = type_map if type_map is not None else [f"Type_{i}" for i in range(ntyp)]
     conf_data["orig"] = np.array([0, 0, 0])
     return dpdata.System(data = conf_data)
 
@@ -551,21 +555,7 @@ def FILONC(DT: float, DOM: float, C: np.ndarray, M: Optional[int] = None) -> np.
     OMEGA = NU * DOM
     THETA = OMEGA * DT
     # CALCULATE THE FILON PARAMETERS
-    SINTH = np.sin(THETA)
-    COSTH = np.cos(THETA)
-    SINSQ = np.square(SINTH)
-    COSSQ = np.square(COSTH)
-    THSQ  = np.square(THETA)
-    THCUB = THSQ * THETA
-    ALPHA = 1. * ( THSQ + THETA * SINTH * COSTH - 2. * SINSQ )
-    BETA  = 2. * ( THETA * ( 1. + COSSQ ) - 2. * SINTH * COSTH )
-    GAMMA = 4. * ( SINTH - THETA * COSTH )
-    ALPHA[0] = 0.
-    BETA[0] = 2. / 3.
-    GAMMA[0] = 4. / 3.
-    ALPHA[1:] /= THCUB[1:]
-    BETA[1:] /= THCUB[1:]
-    GAMMA[1:] /= THCUB[1:]
+    ALPHA, BETA, GAMMA = _FILON_PARAMS(THETA)
     def CAL_C0(theta: np.ndarray, args: Tuple[np.ndarray, np.ndarray]):
         a, b = args
         return np.dot(a, np.cos(theta * b))
@@ -581,30 +571,89 @@ def FILONC(DT: float, DOM: float, C: np.ndarray, M: Optional[int] = None) -> np.
 
 def FT(DT: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
     """
+    Perform a cosine transform on the correlation function using FFT.
     The same as FILONC while `DOM = 2\pi / (M * DT)` (or `OMEGA_MAX = 2\pi / DT`).
-    This is implemented by FFT.
 
     Parameters
     -----
-    C: ndarray, the correlation function.
-    DT: float, time interval between points in C.
-    M: Optional[int], number of intervals on the frequency axis.
-    `M = NMAX` by default.
+    C: ndarray
+        the correlation function.
+    DT: float
+        time interval between points in C.
+    M: Optional[int]
+        number of intervals on the frequency axis. Default is `len(corr) - 1`.
 
-    Return
+    Returns
     -----
+    Frequency and the 1-d cosine transform of the correlation function.
     freq: float, frequency. `freq = 1 / (M * DT)` 
     CHAT: np.ndarray, the 1-d cosine transform.
     """
     NMAX = C.shape[0] - 1
-    assert NMAX % 2 == 0, 'NMAX is not even!'
+    if NMAX % 2 != 0:
+        raise ValueError("NMAX (=len(C)-1) must be even for the cosine transform.")
     if M is None:
         M = NMAX
     elif M % 2 != 0:
         M += 1
+        
+    freq = 1 / (M * DT)
     DTH = 2 * np.pi / M
     NU = np.arange(M + 1)
     THETA = NU * DTH
+
+    ALPHA, BETA, GAMMA = _FILON_PARAMS(THETA)
+    CE, CO = _FFT_OE(C, M)
+    CE, CO = CE.real, CO.real
+    CE -= 0.5 * (C[0] + C[NMAX] * np.cos(THETA * NMAX))
+
+    CHAT = 2.0 * (ALPHA * C[NMAX] * np.sin (THETA * NMAX) + BETA * CE + GAMMA * CO) * DT
+    return freq, CHAT
+
+def FT_sin(DT: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
+    """
+    Perform a sine transform on the correlation function using FFT.
+
+    Parameters
+    -----
+    C: ndarray
+        the correlation function.
+    DT: float
+        time interval between points in C.
+    M: Optional[int]
+        number of intervals on the frequency axis. Default is `len(corr) - 1`.
+
+    Returns
+    -----
+    Frequency and the 1-d sine transform of the correlation function.
+    freq: float, frequency. `freq = 1 / (M * DT)` 
+    CHAT: np.ndarray, the 1-d sine transform.
+    """
+    NMAX = C.shape[0] - 1
+    if NMAX % 2 != 0:
+        raise ValueError("NMAX (=len(C)-1) must be even for the sine transform.")
+    if M is None:
+        M = NMAX
+    elif M % 2 != 0:
+        M += 1
+    
+    freq = 1 / (M * DT)
+    DTH = 2 * np.pi / M
+    NU = np.arange(M + 1)
+    THETA = NU * DTH
+
+    ALPHA, BETA, GAMMA = _FILON_PARAMS(THETA)
+    CE, CO = _FFT_OE(C, M)
+    CE, CO = CE.imag, CO.imag
+    CE -= 0.5 * (C[NMAX] * np.sin(THETA * NMAX))
+
+    CHAT = 2.0 * (ALPHA * (C[0] - C[NMAX] * np.cos(THETA * NMAX)) + BETA * CE + GAMMA * CO) * DT
+    return freq, CHAT
+
+def _FILON_PARAMS(THETA: np.ndarray) -> np.ndarray:
+    """
+    Calculate the filon parameters.
+    """
     SINTH = np.sin(THETA)
     COSTH = np.cos(THETA)
     SINSQ = np.square(SINTH)
@@ -620,21 +669,18 @@ def FT(DT: float, C: np.ndarray, M: Optional[int] = None) -> np.ndarray:
     ALPHA[1:] /= THCUB[1:]
     BETA[1:] /= THCUB[1:]
     GAMMA[1:] /= THCUB[1:]
-    CE, CO = _FFT_OE(C, DTH, M)
-    CE -= 0.5 * (C[0] + C[NMAX] * np.cos(THETA * NMAX))
-    CHAT = 2.0 * (ALPHA * C[NMAX] * np.sin ( THETA * NMAX ) + BETA * CE + GAMMA * CO) * DT
-    freq = 1 / (M * DT)
-    return freq, CHAT
+    return ALPHA, BETA, GAMMA
 
-def _FFT_OE(C: np.ndarray, DTH: float, M: int):
-    NMAX = C.shape[0] - 1
-    NU = np.arange(M + 1)
-    THETA = NU * DTH
+def _FFT_OE(C: np.ndarray, M: int):
+    M0 = int(M / 2)
+    DTH = 2 * np.pi / M
+
     # Even coordinates
-    CE = _range_fft(C[:-1:2], n = int(M / 2)).real # type: ignore
-    CE = np.concatenate([CE, CE, CE[0:1]]) + C[NMAX] * np.cos(THETA * NMAX)
+    CE = _range_fft(C[::2], M0) # type: ignore
+    CE = np.concatenate([CE, CE, CE[0:1]])
+
     # Odd coordinates
-    CO = (_range_fft(C[1::2], n = int(M / 2)) * np.exp(-THETA[:int(M / 2)] * 1j)).real # type: ignore
+    CO = _range_fft(C[1::2], M0) * np.exp(-np.arange(M0) * DTH * 1j) # type: ignore
     CO = np.concatenate([CO, -CO, CO[0:1]])
     return CE, CO
 
